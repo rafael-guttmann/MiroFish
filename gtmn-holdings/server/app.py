@@ -154,8 +154,17 @@ class H(BaseHTTPRequestHandler):
             firm = route_firm(title, b.get("firm"))
             if firm in charters and not approved(firm):
                 return self.send(409, {"error": "charter not approved", "firm": firm, "name": charters[firm]["name"]})
+            picks = [f for f in b.get("firms", []) if f in charters][:4] if firm == "plenary" else []
+            if picks:
+                if len(picks) < 2:
+                    return self.send(400, {"error": "a plenary needs at least two firms"})
+                for f in picks:
+                    if not approved(f):
+                        return self.send(409, {"error": "charter not approved", "firm": f, "name": charters[f]["name"]})
             jid = store.run("INSERT INTO jobs(title,firm,formats,design,created) VALUES(?,?,?,?,?)",
                             (title, firm, json.dumps(fmts), b.get("design"), time.time()))
+            if picks:
+                store.event("picks", "Rafael chose the firms: " + ", ".join(picks), jid, firm)
             store.event("routed", f"Front desk routed the demand to {firm}", jid, firm)
             runner.start(jid)
             return self.send(201, {"id": jid, "firm": firm})

@@ -43,10 +43,14 @@ def run(r, job_id):
         r._stage(job_id, firm, 0, 5, "Chair is deciding which firms must be in the room")
 
         # 1. Convene: the minimum set of firms, then seats per firm
+        ev = s.one("SELECT text FROM events WHERE job=? AND kind='picks'", (job_id,))
+        chosen = [f for f in (ev["text"].split(": ", 1)[1].split(", ") if ev else []) if f in avail]
+        if len(chosen) >= 2:
+            avail = {f: avail[f] for f in chosen}
         menu = "\n".join(f"- {fid}: {c['name']} — owns {', '.join(c.get('owns', []))[:160]}. {c['summary'][:200]}" for fid, c in avail.items())
-        pick = _json(r._say("You are the Chair of the GTMN Plenary. You convene the minimum set of firms that covers every issue in the mandate, never fewer than two, never more than three. You have no view on substance. Reply with JSON only.",
+        pick = _json(r._say("You are the Chair of the GTMN Plenary. You convene the minimum set of firms that covers every issue in the mandate, never fewer than two, never more than three (if Rafael already chose the firms, they are the only ones listed: convene them all). You have no view on substance. Reply with JSON only.",
                             f"Mandate: {title}\n\nFirms available:\n{menu}\n\nReturn {{\"firms\": [firm ids], \"lead\": firm id that holds the pen, \"why\": one sentence, \"issues\": [the 2-4 questions the mandate breaks into]}}", 900))
-        fids = [f for f in pick["firms"] if f in avail][:MAX_FIRMS]
+        fids = chosen if len(chosen) >= 2 else [f for f in pick["firms"] if f in avail][:MAX_FIRMS]
         if len(fids) < 2:
             fids = [f for f in avail if f != "gtmn-cto"][:2] if len(fids) == 0 else fids + [next(f for f in avail if f not in fids)]
         lead = pick.get("lead") if pick.get("lead") in fids else fids[0]

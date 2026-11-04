@@ -238,6 +238,30 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 .fl-roster{margin:12px 0}.fl-roster h3{font:600 13px var(--sans);color:var(--ink2);margin-bottom:8px}
 .fl-roster button{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 9px;margin:0 6px 6px 0;border:1px solid var(--line);border-radius:99px;background:var(--card)}
 .fl-roster button i{width:8px;height:8px;border-radius:50%;background:var(--a)}.fl-roster button.idle{color:var(--ink3)}.fl-roster button.idle i{opacity:.35}
+
+.steer{margin-top:28px;border-top:1px solid var(--line);padding-top:8px}
+.thread{max-height:320px;overflow:auto;display:flex;flex-direction:column;gap:12px;margin-bottom:12px}
+.msg{display:flex;gap:10px;align-items:flex-start;max-width:92%}.msg.me{align-self:flex-end;flex-direction:row-reverse}
+.msg small{color:var(--ink3);font-size:12px}.msg p{margin:2px 0 0;padding:9px 13px;border-radius:14px;background:#fff;border:1px solid var(--line);font-size:14px;line-height:1.45}
+.msg.me p{background:var(--ink);color:#fff;border-color:var(--ink)}
+.dots i{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--ink3);margin:0 2px;animation:dt 1s infinite}.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dt{50%{opacity:.25;transform:translateY(-2px)}}
+.sug{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.sug .chip{font-size:12.5px;padding:6px 11px}
+.pend{display:flex;gap:6px;flex-wrap:wrap}.fchip{display:inline-flex;gap:6px;align-items:center;background:#EEF0F4;border-radius:99px;padding:3px 10px;font-size:12px;margin-top:4px}.fchip button{font-size:14px;color:var(--ink3)}
+.comp{display:flex;gap:8px;align-items:flex-end;background:#fff;border:1px solid var(--line);border-radius:16px;padding:8px;position:sticky;bottom:8px;box-shadow:0 8px 24px -14px rgba(10,12,18,.4)}
+.wtoggle{display:flex;gap:6px;margin:6px 0}.comp textarea{min-height:38px;flex:1;border:0;outline:0;resize:none;font:inherit;font-size:15px;padding:8px 6px;background:transparent}
+.att{width:38px;height:38px;display:grid;place-items:center;border-radius:10px;cursor:pointer;color:var(--ink2)}.att:hover{background:#EEF0F4}.att svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.comp .send{padding:9px 16px;border-radius:10px;background:var(--ink);color:#fff;font-weight:600}.comp .send:disabled{opacity:.35}
+.libwrap h1{margin-bottom:4px}
+.bkbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:#EAF5EE;border:1px solid #CFE6D7;color:#1c5a35;border-radius:12px;padding:12px 14px;margin:14px 0}.bkbar span{flex:1;min-width:180px;font-size:13px}
+.lgrp{margin-top:18px;border-left:4px solid var(--a);padding-left:12px}.lh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}.lh h2{margin:0}.lh small{color:var(--ink3)}
+.doc{display:flex;gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:8px 0}
+.dico{width:38px;height:38px;border-radius:10px;background:color-mix(in srgb,var(--a,#475569) 14%,#fff);color:var(--a,#475569);display:grid;place-items:center;font-weight:700;flex:none}
+.dmain{min-width:0;flex:1}.dmain b em{font-style:normal;font-weight:500;color:var(--ink3);font-size:12.5px;margin-left:6px}.dmain small{display:block;color:var(--ink3);font-size:12.5px;margin-top:2px}.dmain p{margin:6px 0;font-size:14px;color:var(--ink2)}
+.dfm{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}.dfm .chip{font-size:12.5px;padding:6px 11px}.dlb{background:var(--a)!important;color:#fff!important;border-color:var(--a)!important}.ask{font-size:13px;color:#b45309;font-weight:600}
+.ghostc{border-style:dashed!important}.bk{color:#1c7a45!important}
+.fpick{background:#F5F6F9;border-radius:10px;padding:10px 12px;margin:6px 0}.fchips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.submit.sm{padding:8px 16px;font-size:14px}
+.std{align-items:center}.libwrap .drop{display:block;margin-top:10px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -247,6 +271,7 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
     <button class="tab" role="tab" data-tab="office" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M4 20V8l8-4 8 4v12M4 20h16M9 20v-5h6v5M9 11h.01M15 11h.01"/></svg>Office</button>
     <button class="tab" role="tab" data-tab="floor"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg>Floor</button>
     <button class="tab" role="tab" data-tab="board"><svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="5" height="16" rx="1.2"/><rect x="10" y="4" width="5" height="10" rx="1.2"/><rect x="16.5" y="4" width="4" height="13" rx="1.2"/></svg>Work</button>
+    <button class="tab" role="tab" data-tab="lib"><svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 015.5 4H10l2 2.5h6.5A1.5 1.5 0 0120 8v9.5a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 014 17.5z"/></svg>Library</button>
     <button class="tab" role="tab" data-tab="needs"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M12 8.5v3M12 13.6h.01"/></svg>Needs you<span class="badge" id="badge" data-n="0"></span></button>
     <button class="tab" role="tab" data-tab="new"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New demand</button>
   </nav>
@@ -257,6 +282,6 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 <div class="toast" id="toast" role="status"></div>
 <script src="data.js"></script>
 <script src="floor.js?v=12"></script>
-<script src="app.js"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

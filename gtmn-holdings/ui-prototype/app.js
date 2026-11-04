@@ -8,7 +8,7 @@
   const initials = n => n.replace(/[^A-Za-zÀ-ÿ ]/g, "").split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, work: null, workBy: "firm", open: new Set(), sel: new Set(), state: {}, task: {}, convened: ["gtmn-cto", "dani", "spc-deal-team"] };
+  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, work: null, workBy: "firm", open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), convened: ["gtmn-cto", "dani", "spc-deal-team"] };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
   const firmAgents = f => f.agents.map(a => ({ ...a, st: S.state[f.id + "/" + a.id] }));
@@ -36,6 +36,18 @@
     { id: 11, t: "Plan House: unit economics deep dive", f: "plan-house", col: "work", p: .8 },
   ];
   const fl = id => id === "plenary" ? PLENARY : byId[id];
+  const FMT = { Excel: "xlsx", PowerPoint: "pptx", Word: "docx", PDF: "pdf", JPEG: "jpg" };
+  const ag = (f, i) => byId[f].agents[i % byId[f].agents.length].name;
+  let docs = [
+    { id: "d1", job: 8, name: "Plenary plugin: technical review", type: "Memo", why: "Decides whether the Plenary plugin is safe to build on.", by: ag("gtmn-cto", 0), ver: 2, fmts: ["PDF"], st: "final", at: "2 Nov, 17:40" },
+    { id: "d2", job: 9, name: "Credit portfolio review, Q3", type: "Report", why: "The ten-page review for the noteholders.", by: ag("zencredit-firm", 0), ver: 1, fmts: ["Word", "PDF"], st: "final", at: "30 Oct, 11:05" },
+    { id: "d3", job: 9, name: "Q3 methodology walkthrough", type: "Report", why: "Shows how every number was calculated.", by: ag("zencredit-firm", 1), ver: 1, fmts: ["PDF"], st: "final", at: "30 Oct, 11:05" },
+    { id: "d4", job: 3, name: "Revised indemnity clause", type: "Legal text", why: "Goes to the counterparty once you approve it.", by: ag("ogc-dg", 5), ver: 2, fmts: ["Word"], st: "draft", at: "4 Nov, 09:12" },
+    { id: "d5", job: 11, name: "Unit economics model", type: "Model", why: "The numbers behind the go/no-go.", by: ag("plan-house", 3), ver: 1, fmts: [], st: "draft", at: "4 Nov, 14:20" },
+    { id: "d6", job: 5, name: "Noteholder pack, Q4", type: "Report", why: "Quarterly update for noteholders.", by: ag("zencredit-firm", 2), ver: 1, fmts: [], st: "draft", at: "4 Nov, 13:02" },
+    { id: "d7", job: 10, name: "Orbit Labs brand brief", type: "Deck", why: "The direction for the brand refresh.", by: ag("marketing-house", 0), ver: 1, fmts: [], st: "draft", at: "4 Nov, 12:30" },
+  ];
+  let stds = [{ name: "GTMN master brand guide.pdf", scope: "All firms", at: "28 Oct" }];
 
   let cards = [
     { id: "c1", job: 2, firm: "plan-house", agent: byId["plan-house"].agents[2].name, kind: "one", q: "Which base year should the five-year model use?",
@@ -51,6 +63,9 @@
       opts: [["SPC Deal Team", "Venture diligence on the company and the round.", 1], ["Office of the CIO", "Fit with the family office allocation.", 1], ["DG-IB", "Valuation and deal structure."], ["Office of the CTO", "Technical due diligence on the product."]],
       why: "Each firm writes its position blind, then they cross-examine each other inside their own lanes.", def: "If you don't answer, I'll convene the recommended ones." },
   ];
+  cards.push({ id: "c5", job: 11, firm: "plan-house", agent: ag("plan-house", 3), kind: "many", fmtDoc: "d5", q: "The unit economics model is ready. Which formats do you want?",
+      opts: [["Excel", "The live model with formulas.", 1], ["PowerPoint", "A short deck with the key charts."], ["Word", "A written memo."], ["PDF", "A fixed copy to share.", 1], ["JPEG", "Charts as images."]],
+      why: "Each format is built for its purpose, so it is cheaper to ask now than to convert later.", def: "If you don't answer, I'll make Excel and PDF." });
   const feed = [];
   const say = (fid, who, text) => { feed.unshift({ fid, who, text, t: clock() }); if (feed.length > 40) feed.pop(); if ($("#aside")) renderAside(true); };
   say("ogc-dg", "OGC DG", "Seat 6 asked you to approve an indemnity clause");
@@ -177,8 +192,74 @@
       <h2>Step by step</h2>
       <div class="tl">${d.stages.map((s, i) => `<div class="tstage ${s.st}"><button class="th" data-stage="${j.id}:${i}" aria-expanded="${S.open.has(j.id + ":" + i)}"><i></i><b>${esc(s.nm)}</b><small>${s.st === "done" ? "Done" : s.st === "now" ? "In progress" : s.st === "ask" ? "Waiting for you" : "Next"}</small></button>
         ${S.open.has(j.id + ":" + i) ? `<div class="tb">${s.steps.length ? s.steps.map(x => `<div class="ts">${pawn(f, x.w.name, "")}<div><b>${esc(x.w.name)}</b> <small>${x.t}</small><p>${esc(x.what)}</p></div></div>`).join("") : `<p class="sub">Not started. ${esc(s.who.map(w => w.name).join(" and "))} will take it.</p>`}</div>` : ""}</div>`).join("")}</div>
+      <h2>Deliverables</h2><div id="dlv">${docsFor(j.id)}</div>
       ${d.next.length && j.col !== "done" ? `<h2>What comes next</h2><ul class="nx">${d.next.slice(0, 3).map((s, i) => `<li><b>${esc(s.nm)}</b><small>${esc(s.who[0].name)}${i === 0 && j.col !== "wait" ? " · after the current step" : ""}</small></li>`).join("")}</ul>` : ""}
-    </div>`;
+    </div>
+    ${steerBox(j)}`;
+  }
+  const thr = j => S.thread[j.id] || (S.thread[j.id] = []);
+  const msgHtml = (m, j) => `<div class="msg ${m.me ? "me" : ""}">${m.me ? "" : pawn(fl(j.f), fl(j.f).name, "")}<div><small>${m.me ? "You" : esc(fl(j.f).name) + " desk"} · ${m.t}</small><p>${esc(m.text)}${m.typing ? '<span class="dots"><i></i><i></i><i></i></span>' : ""}</p>${(m.files || []).map(x => `<span class="fchip">${esc(x)}</span>`).join("")}</div></div>`;
+  function steerBox(j) {
+    const t = thr(j), sug = ["Use our brand guide", "Make it shorter", "Add a risk lens", "Also give me Excel"];
+    return `<div class="steer"><h2>Steer this work</h2><div id="thread" class="thread">${t.length ? t.map(m => msgHtml(m, j)).join("") : `<p class="sub">Add a note, a file or a change at any time. The desk reads it and adjusts. Finished steps stay.</p>`}</div>
+      <div class="sug">${sug.map(s => `<button class="chip" data-sug="${esc(s)}">${esc(s)}</button>`).join("")}</div>
+      <div id="pend" class="pend"></div>
+      <div class="comp"><label class="att" title="Attach a file or design system"><svg viewBox="0 0 24 24"><path d="M20 11l-8 8a5 5 0 01-7-7l8-8a3.5 3.5 0 015 5l-8 8a2 2 0 01-3-3l7-7"/></svg><input type="file" id="sfile" multiple hidden></label><textarea id="snote" rows="1" placeholder="Change something, add a request, or attach a design system…"></textarea><button class="send" id="ssend" disabled>Send</button></div></div>`;
+  }
+  function steer(j, text, files) {
+    const t = thr(j), now = clock();
+    t.push({ me: 1, text: text || "(file attached)", files, t: now });
+    const r = { text: "", typing: 1, t: now }; t.push(r); drawThread(j);
+    const d = detail(j), nowSt = d.stages.find(s => s.st === "now") || d.stages.find(s => s.st !== "done");
+    let reply = "";
+    if (files.length) { files.forEach(n => stds.unshift({ name: n, scope: "This demand: " + j.t, at: "Today" })); reply += `Saved ${files.join(", ")} to Design standards. I'll apply it from the next step. Work already delivered stays as it is unless you ask. `; }
+    const m = (text || "").match(/excel|power ?point|ppt|word|pdf|jpe?g/gi);
+    if (m) { const names = [...new Set(m.map(x => /excel/i.test(x) ? "Excel" : /pow|ppt/i.test(x) ? "PowerPoint" : /word/i.test(x) ? "Word" : /pdf/i.test(x) ? "PDF" : "JPEG"))]; docs.filter(x => x.job === j.id).forEach(x => names.forEach(n => { if (!x.fmts.includes(n)) x.fmts.push(n); })); reply += `Added ${names.join(", ")} to this demand's deliverables. `; }
+    if (/stop|pause|hold/i.test(text || "")) reply += "Paused at the end of the current step. Say \"go on\" when ready.";
+    else if (text) { if (j.col === "done") { j.col = "work"; j.p = .85; reply += "Reopened. I'll revise the deliverable and keep the earlier version. "; } reply += nowSt ? `I'll adjust from "${nowSt.nm}". Steps already finished stay.` : "I'll pick it up in the next step."; }
+    say(j.f, fl(j.f).name, "Change request received: " + ((text || files[0] || "").slice(0, 48)));
+    setTimeout(() => { r.typing = 0; let i = 0; const iv = setInterval(() => { i += 3; r.text = reply.slice(0, i); drawThread(j); if (i >= reply.length) { clearInterval(iv); const dv = $("#dlv"); if (dv) dv.innerHTML = docsFor(j.id); } }, 22); }, 900);
+  }
+  function drawThread(j) { const el = $("#thread"); if (!el) return; el.innerHTML = thr(j).map(m => msgHtml(m, j)).join(""); el.scrollTop = el.scrollHeight; }
+  function wireWork() {
+    const j = jobs.find(x => x.id === S.work); if (!j) return;
+    const n = $("#snote"), s = $("#ssend"), f = $("#sfile"), p = $("#pend");
+    const upd = () => { s.disabled = !(n.value.trim() || S.pend.length); p.innerHTML = S.pend.map((x, i) => `<span class="fchip">${esc(x)} <button data-unpend="${i}" aria-label="Remove">×</button></span>`).join(""); };
+    n.oninput = () => { n.style.height = "auto"; n.style.height = Math.min(120, n.scrollHeight) + "px"; upd(); };
+    n.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!s.disabled) s.click(); } };
+    f.onchange = () => { S.pend.push(...[...f.files].map(x => x.name)); upd(); };
+    s.onclick = () => { steer(j, n.value.trim(), S.pend.splice(0)); n.value = ""; n.style.height = "auto"; upd(); };
+    document.querySelectorAll("[data-sug]").forEach(b => b.onclick = () => { n.value = b.dataset.sug; n.focus(); upd(); });
+    p.onclick = e => { const u = e.target.closest("[data-unpend]"); if (u) { S.pend.splice(+u.dataset.unpend, 1); upd(); } };
+    upd(); drawThread(j);
+  }
+
+  /* LIBRARY */
+  const dl = (d, fmt) => { const ext = FMT[fmt], nm = `${d.name.replace(/[^\w]+/g, "-")}-v${d.ver}.${ext}`; const b = new Blob([`GTMN Holdings sample file\n${d.name}\nVersion ${d.ver}\nFormat: ${fmt}\nThis is a prototype placeholder.`], { type: "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = nm; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 500); toast("Downloading " + nm); };
+  const fmtPicker = d => `<div class="fpick"><b>Which formats?</b><div class="fchips">${Object.keys(FMT).map(k => `<button class="chip" data-fmt="${k}" aria-pressed="${S.fmtSel.has(k)}">${k}</button>`).join("")}</div><button class="submit sm" data-fmtok="${d.id}" ${S.fmtSel.size ? "" : "disabled"}>${d.fmts.length ? "Add formats" : "Confirm"}</button></div>`;
+  function docRow(d) {
+    const j = jobs.find(x => x.id === d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
+    return `<div class="doc" style="--a:${ac}"><div class="dico">${esc(d.type.slice(0, 1))}</div><div class="dmain"><b>${esc(d.name)} <em>v${d.ver}${d.st === "draft" ? " · draft" : ""}</em></b>
+      <small>${esc(d.type)} · from ${esc(f.name)}, ${esc(d.by)} · ${d.at}</small><p>${esc(d.why)}</p>
+      <div class="dfm">${d.fmts.length ? d.fmts.map(k => `<button class="chip dlb" data-dl="${d.id}:${k}">↓ ${k}</button>`).join("") : `<span class="ask">Format not chosen yet</span>`}<button class="chip ghostc" data-fmtopen="${d.id}">${d.fmts.length ? "+ Another format" : "Choose formats"}</button></div>
+      ${S.fmtOpen === d.id ? fmtPicker(d) : ""}
+      <small class="bk">✓ Backed up · vault + second copy · ${d.at}</small></div></div>`;
+  }
+  function docsFor(jid) {
+    const l = docs.filter(d => d.job === jid);
+    return l.length ? l.map(docRow).join("") : `<p class="sub">Nothing produced yet. Files appear here and in the Library as they are made.</p>`;
+  }
+  function library() {
+    const by = S.lib, groups = new Map();
+    docs.forEach(d => { const j = jobs.find(x => x.id === d.job), k = by === "demand" ? j.id : j.f; (groups.get(k) || groups.set(k, []).get(k)).push(d); });
+    return `<div class="libwrap"><h1>Library</h1><p class="sub">Everything the firms produce, saved in one place, backed up, and sorted by the demand it came from.</p>
+      <div class="bkbar"><b>✓ All ${docs.length} files backed up</b><span>Saved to the vault and copied every night to a second location. Last backup 14:02.</span><button class="chip" data-dlall="1">↓ Download everything</button></div>
+      <div class="wtoggle"><button class="chip" data-libby="demand" aria-pressed="${by === "demand"}">By demand</button><button class="chip" data-libby="firm" aria-pressed="${by === "firm"}">By firm</button></div>
+      ${[...groups].map(([k, l]) => { const j = by === "demand" ? jobs.find(x => x.id === k) : null, f = fl(by === "demand" ? j.f : k), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
+        return `<section class="lgrp" style="--a:${ac}"><div class="lh"><h2>${esc(by === "demand" ? j.t : f.name)}</h2><small>${by === "demand" ? esc(f.name) + " · " + STL[j.col] : l.length + " files"}</small></div>${l.map(docRow).join("")}</section>`; }).join("")}
+      <h2 style="margin-top:28px">Design standards</h2><p class="sub">Brand guides and templates. New work follows them. You can also attach one inside any demand.</p>
+      ${stds.map(s => `<div class="doc std"><div class="dico">▤</div><div class="dmain"><b>${esc(s.name)}</b><small>${esc(s.scope)} · added ${s.at}</small></div></div>`).join("")}
+      <label class="drop">Drop a design system here or <u>choose a file</u><input type="file" id="stdfile" multiple hidden></label></div>`;
   }
 
   /* NEEDS YOU */
@@ -202,6 +283,7 @@
     const el = $("#qcard"); if (el) el.classList.add("out");
     setTimeout(() => {
       cards.shift(); S.sel.clear();
+      if (c.fmtDoc) { const d = docs.find(x => x.id === c.fmtDoc); const ks = Object.keys(FMT).filter(k => text.includes(k)); if (d) d.fmts = ks.length ? ks : ["Excel", "PDF"]; }
       const j = jobs.find(x => x.id === c.job); if (j) { j.col = "work"; j.p = Math.max(j.p, .4); }
       if (c.firm === "plenary") { c.opts.forEach((o, i) => { }); }
       Object.keys(S.state).forEach(k => { if (S.state[k] === "asking" && k.startsWith(c.firm + "/")) { S.state[k] = "working"; S.task[k] = "Carrying on with your answer"; } });
@@ -217,6 +299,7 @@
     return `<div class="form"><h1>What do you need?</h1><p class="sub" style="margin-bottom:20px">Write it like a note to a colleague. They'll ask if they need more.</p>
       <textarea class="big" id="demand" placeholder="For example: Should we acquire a Brazilian payments company at a 6x revenue multiple?"></textarea>
       <div class="drop">Drop files here or <label style="text-decoration:underline;cursor:pointer">choose files<input type="file" multiple hidden></label></div>
+      <h2 style="margin-top:20px">Deliverable format</h2><div class="routes"><button class="chip" data-nfmt="" aria-pressed="${!S.newFmts.size}">Ask me when it's ready</button>${Object.keys(FMT).map(k => `<button class="chip" data-nfmt="${k}" aria-pressed="${S.newFmts.has(k)}">${k}</button>`).join("")}</div>
       <h2 style="margin-top:20px">Send to</h2>
       <div class="routes"><button class="chip" data-route="" aria-pressed="${S.route === null}">Let the front desk choose</button><button class="chip" data-route="plenary" aria-pressed="${S.route === "plenary"}">Several firms (Plenary)</button>${FIRMS.map(f => `<button class="chip" style="--a:${f.accent}" data-route="${f.id}" aria-pressed="${S.route === f.id}"><i></i>${esc(f.name)}</button>`).join("")}</div>
       <p class="route-note">${note}</p>
@@ -233,13 +316,15 @@
 
   function render() {
     const m = $("#main");
-    m.innerHTML = { office, floor, board: work, needs, new: newDemand }[S.tab]();
+    m.innerHTML = { office, floor, board: work, lib: library, needs, new: newDemand }[S.tab]();
     document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === S.tab));
     const b = $("#badge"); b.textContent = cards.length || ""; b.dataset.n = cards.length;
     renderAside();
     if (S.tab === "floor") mountFloor();
     if (S.tab === "needs") wireNeeds();
     if (S.tab === "new") wireNew();
+    if (S.tab === "board" && S.work) wireWork();
+    if (S.tab === "lib") { const sf = $("#stdfile"); if (sf) sf.onchange = () => { [...sf.files].forEach(x => stds.unshift({ name: x.name, scope: "All firms", at: "Today" })); toast("Saved. New work will follow it."); render(); }; }
   }
   function wireNeeds() {
     const c = cards[0]; if (!c) return;
@@ -265,25 +350,35 @@
   function wireNewSubmit() {
     const d = $("#demand"), s = $("#submit");
     d.oninput = () => s.disabled = !d.value.trim();
+    document.querySelectorAll("[data-nfmt]").forEach(b => b.onclick = () => { const v = b.dataset.nfmt, keep = d.value; v ? (S.newFmts.has(v) ? S.newFmts.delete(v) : S.newFmts.add(v)) : S.newFmts.clear(); render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     document.querySelectorAll("[data-route]").forEach(b => b.onclick = () => { const v = b.dataset.route, keep = d.value; S.route = v || null; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     s.onclick = () => {
       const t = d.value.trim(); if (!t) return;
       const id = S.route || (/acqui|invest|back|deal/i.test(t) ? "plenary" : "gtmn-cto");
-      jobs.unshift({ id: Date.now(), t: t.length > 70 ? t.slice(0, 70) + "…" : t, f: id, col: "wait", p: 0 });
+      const jid = Date.now(), jt = t.length > 70 ? t.slice(0, 70) + "…" : t;
+      jobs.unshift({ id: jid, t: jt, f: id, col: "wait", p: 0 });
+      docs.unshift({ id: "d" + jid, job: jid, name: "Deliverable: " + jt, type: "Report", why: "Produced for this demand.", by: id === "plenary" ? "Plenary Chair" : ag(id, 0), ver: 1, fmts: [...S.newFmts], st: "draft", at: "Today" }); S.newFmts.clear();
       say(id, "Front desk", `New demand routed to ${fl(id).name}`);
       S.route = null; S.tab = "board"; render(); toast(`Sent to ${fl(id).name}. You'll see it move on the board.`);
     };
   }
 
+  const keep = () => { const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; };
   document.addEventListener("click", e => {
     const t = e.target.closest("button"); if (!t) return;
-    if (t.dataset.tab) { S.tab = t.dataset.tab; if (S.tab === "board") S.work = null; if (S.tab === "office") { S.firm = null; S.agent = null; } render(); }
+    if (t.dataset.tab) { S.fmtOpen = null; S.tab = t.dataset.tab; if (S.tab === "board") S.work = null; if (S.tab === "office") { S.firm = null; S.agent = null; } render(); }
     else if (t.dataset.firm && S.tab === "office") { S.firm = t.dataset.firm; S.agent = null; S.showAll = false; render(); }
     else if (t.dataset.agent) { S.agent = t.dataset.agent; render(); }
     else if (t.dataset.back) { if (t.dataset.back === "b") S.firm = null; S.agent = null; render(); }
     else if (t.dataset.showall) { S.showAll = true; render(); }
     else if (t.dataset.goneeds) { S.tab = "needs"; render(); }
     else if (t.dataset.work) { S.work = +t.dataset.work; S.open = new Set([S.work + ":" + detail(jobs.find(j => j.id === S.work)).cur]); render(); $("#main").scrollTop = 0; }
+    else if (t.dataset.libby) { S.lib = t.dataset.libby; render(); }
+    else if (t.dataset.fmtopen) { S.fmtOpen = S.fmtOpen === t.dataset.fmtopen ? null : t.dataset.fmtopen; S.fmtSel.clear(); keep(); }
+    else if (t.dataset.fmt) { const k = t.dataset.fmt; S.fmtSel.has(k) ? S.fmtSel.delete(k) : S.fmtSel.add(k); keep(); }
+    else if (t.dataset.fmtok) { const d = docs.find(x => x.id === t.dataset.fmtok); S.fmtSel.forEach(k => { if (!d.fmts.includes(k)) d.fmts.push(k); }); toast("Will be made as " + [...S.fmtSel].join(", ")); S.fmtSel.clear(); S.fmtOpen = null; keep(); }
+    else if (t.dataset.dl) { const [id, k] = t.dataset.dl.split(":"); dl(docs.find(x => x.id === id), k); }
+    else if (t.dataset.dlall) { toast("Preparing one zip with every file (sample in this prototype)."); }
     else if (t.dataset.wback) { S.work = null; render(); }
     else if (t.dataset.wby) { S.workBy = t.dataset.wby; render(); }
     else if (t.dataset.stage) { S.open.has(t.dataset.stage) ? S.open.delete(t.dataset.stage) : S.open.add(t.dataset.stage); const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; }

@@ -1,0 +1,173 @@
+{
+  "id": "zencredit-firm",
+  "name": "ZenCredit Firms",
+  "version": "1.0.0",
+  "kind": "firm",
+  "status": "proposed",
+  "summary": "Analysis firm for a merchant cash advance book: six functional seats delivering portfolio reviews, noteholder and IC packs, with a methodology walkthrough.",
+  "accent": "#15803D",
+  "source": {
+    "plugin": "zencredit-firm-1.7.0",
+    "agents_dir": "agents",
+    "skills_dir": "skills"
+  },
+  "desk": {
+    "skill": "run-firm",
+    "modes": [
+      "run-firm",
+      "monthly-close",
+      "noteholder-reporting",
+      "quant-report",
+      "research-industries"
+    ]
+  },
+  "agents": [
+    {
+      "id": "bi-publisher",
+      "role": "BI Publisher",
+      "model": "opus",
+      "tools": [
+        "Bash",
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep"
+      ]
+    },
+    {
+      "id": "cohort-analyst",
+      "role": "Cohort Analyst",
+      "model": "opus",
+      "tools": [
+        "Bash",
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "WebSearch",
+        "WebFetch"
+      ]
+    },
+    {
+      "id": "credit-counsel",
+      "role": "Credit Counsel - US Regulatory",
+      "model": "opus",
+      "tools": [
+        "WebSearch",
+        "WebFetch",
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash"
+      ]
+    },
+    {
+      "id": "managing-partner",
+      "role": "Managing Partner",
+      "model": "opus",
+      "tools": [
+        "Bash",
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Agent",
+        "WebSearch",
+        "WebFetch"
+      ]
+    },
+    {
+      "id": "quant-research",
+      "role": "Head of Quantitative Research",
+      "model": "opus",
+      "tools": [
+        "Bash",
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "WebSearch",
+        "WebFetch"
+      ]
+    },
+    {
+      "id": "returns-analyst",
+      "role": "Returns Analyst",
+      "model": "opus",
+      "tools": [
+        "Bash",
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep"
+      ]
+    }
+  ],
+  "owns": [
+    "evidence on the ZenCredit MCA book",
+    "returns",
+    "cohorts",
+    "default modelling",
+    "portfolio triage"
+  ],
+  "cannot_veto": [
+    "legality",
+    "price of a fundraise",
+    "structure"
+  ],
+  "pen_default_for": [
+    "MCA book analysis",
+    "noteholder package"
+  ],
+  "senior_panel": [
+    "managing-partner"
+  ],
+  "signoff_seat": "managing-partner",
+  "always_convened": [
+    {
+      "agent": "credit-counsel",
+      "when": "any mandate touching characterisation, licensing or collections of MCA paper"
+    }
+  ],
+  "dispatch": "layered",
+  "layers": [
+    [
+      "returns-analyst",
+      "credit-counsel"
+    ],
+    [
+      "cohort-analyst"
+    ],
+    [
+      "quant-research"
+    ]
+  ],
+  "gates": [
+    {
+      "name": "workspace and data reconciliation",
+      "approver": "seat",
+      "defined_in": "SKILL.md"
+    }
+  ],
+  "interaction": {
+    "ask_via": "question_card",
+    "default_if_unanswered": "use_recommended"
+  },
+  "outputs": [
+    "docx",
+    "pdf",
+    "html",
+    "xlsx"
+  ],
+  "notes": "Supplies the portfolio evidence ogc-dg Group 14 needs; ogc-bruce refuses a characterisation conclusion without it. Metric definitions come from the mca-metrics service, never from a seat.",
+  "tools_runtime": [
+    "engine"
+  ]
+}

@@ -1,0 +1,304 @@
+{
+  "id": "dg-ib",
+  "name": "DG-IB",
+  "version": "1.0.0",
+  "kind": "firm",
+  "status": "proposed",
+  "summary": "Delta Global's investment bank: six product groups, 17 personas, three senior partners and an enforced modelling standard that can stop delivery.",
+  "accent": "#B45309",
+  "source": {
+    "plugin": "dg-ib-1.1.0",
+    "agents_dir": "agents",
+    "skills_dir": "skills",
+    "house_dir": "house",
+    "knowledge_dir": "knowledge"
+  },
+  "desk": {
+    "skill": "dg-ib",
+    "modes": [
+      "dispatch",
+      "refresh-bench"
+    ]
+  },
+  "agents": [
+    {
+      "id": "dgib-bourkoff",
+      "role": "Relationship Capital and Narrative",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-buyer",
+      "role": "IPO Process Design and Readiness",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-cohen",
+      "role": "Execution, Approvals and Numbers Integrity",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-ecm-head",
+      "role": "Equity Execution",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-esteves",
+      "role": "LATAM Capital",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-ig-dcm",
+      "role": "Ratings and Issuance Strategy",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-jimmy-lee",
+      "role": "Syndicated and Leveraged Finance",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-kurtz",
+      "role": "Recovery, Waterfall and the Plan Negotiation",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-milken",
+      "role": "High-Yield Credit and Capital Structure",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-modeling-standard",
+      "role": "Construction, Integrity, Auditability",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-moelis",
+      "role": "Private Capital and Restructuring",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-perella",
+      "role": "Process Design and Counterparty Management",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-quattrone",
+      "role": "Technology M&A and the Manufacture of Tension",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-restructuring-valuation",
+      "role": "Distressed and Plan Valuation",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-rohatyn",
+      "role": "Statesman, Advisory Conscience",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-saeed",
+      "role": "Strategic Transaction Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "dgib-wasserstein",
+      "role": "Chairman, Value Maximisation",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    }
+  ],
+  "owns": [
+    "price",
+    "valuation",
+    "capacity to raise",
+    "market terms",
+    "financial models"
+  ],
+  "veto": [
+    {
+      "ground": "a DG-IB number its model does not support may not appear in the deliverable (dgib-modeling-standard)"
+    }
+  ],
+  "cannot_veto": [
+    "legality",
+    "structure",
+    "governance",
+    "whether LEGACY or Delta capital goes in"
+  ],
+  "pen_default_for": [
+    "sale",
+    "acquisition",
+    "raise",
+    "IPO",
+    "restructuring",
+    "valuation"
+  ],
+  "senior_panel": [
+    "dgib-wasserstein",
+    "dgib-rohatyn",
+    "dgib-cohen"
+  ],
+  "signoff_seat": "dgib-cohen",
+  "always_convened": [
+    {
+      "agent": "dgib-modeling-standard",
+      "when": "any number is in play (Modeling Tier Gate)"
+    }
+  ],
+  "dispatch": "parallel",
+  "gates": [
+    {
+      "name": "Modeling Tier Gate",
+      "approver": "seat",
+      "defined_in": "SKILL.md"
+    }
+  ],
+  "interaction": {
+    "ask_via": "question_card",
+    "default_if_unanswered": "use_recommended",
+    "intake_questionnaire": "references/intake-router.md"
+  },
+  "outputs": [
+    "md",
+    "docx",
+    "pdf",
+    "xlsx",
+    "pptx"
+  ],
+  "notes": "dgib-wasserstein and dgib-rohatyn are closed bodies of work. dgib-cohen and ogc-cohen are one source."
+}

@@ -1,0 +1,221 @@
+{
+  "id": "spc-deal-team",
+  "name": "SPC Deal Team",
+  "version": "1.0.0",
+  "kind": "firm",
+  "status": "proposed",
+  "summary": "Spawn Point Capital's buy-side venture team: five process layers, 9 personas applying buyout-grade diligence to venture deals.",
+  "accent": "#BE123C",
+  "source": {
+    "plugin": "spc-deal-team-1.1.0",
+    "agents_dir": "agents",
+    "skills_dir": "skills",
+    "house_dir": "house",
+    "knowledge_dir": "knowledge"
+  },
+  "desk": {
+    "skill": "spc-deal-team",
+    "modes": [
+      "deal-work-up",
+      "refresh-bench"
+    ]
+  },
+  "agents": [
+    {
+      "id": "spc-bravo",
+      "role": "The Diligence Standard",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "spc-gurley",
+      "role": "Business Quality, Unit Economics and Entry Price",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "spc-kazah",
+      "role": "The Latin America Overlay",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "spc-maples",
+      "role": "Inflections, Insight, and the Backcast",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "spc-moritz",
+      "role": "The Founder, and Whether This Is a Company",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "spc-neumann",
+      "role": "Fund Arithmetic and Knightian Uncertainty",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "spc-rabois",
+      "role": "The People Question",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "spc-thiel",
+      "role": "Monopoly Thesis and the Power-Law Underwrite",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "spc-wilson",
+      "role": "Thesis Fit and the Reserve Consequence",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    }
+  ],
+  "owns": [
+    "underwriting a specific Spawn Point cheque",
+    "venture diligence status",
+    "the WWNTB ledger"
+  ],
+  "veto": [
+    {
+      "ground": "Spawn Point does not write the cheque (its own cheque only)"
+    }
+  ],
+  "cannot_veto": [
+    "anything outside Spawn Point's own investment"
+  ],
+  "pen_default_for": [
+    "buy-side venture work-ups",
+    "IC memo for a Spawn Point investment"
+  ],
+  "senior_panel": [
+    "spc-thiel",
+    "spc-moritz",
+    "spc-wilson",
+    "spc-neumann"
+  ],
+  "signoff_seat": "spc-gurley",
+  "always_convened": [
+    {
+      "agent": "spc-kazah",
+      "when": "any LATAM deal (regional overlay across every layer)"
+    },
+    {
+      "agent": "spc-bravo",
+      "when": "always (GTMN conflict screen before any metric)"
+    }
+  ],
+  "dispatch": "layered",
+  "layers": [
+    [
+      "spc-maples"
+    ],
+    [
+      "spc-maples",
+      "spc-bravo"
+    ],
+    [
+      "spc-gurley",
+      "spc-bravo",
+      "spc-rabois"
+    ],
+    [
+      "spc-gurley",
+      "spc-thiel",
+      "spc-moritz",
+      "spc-wilson",
+      "spc-rabois"
+    ],
+    [
+      "spc-thiel",
+      "spc-moritz",
+      "spc-wilson",
+      "spc-neumann"
+    ]
+  ],
+  "gates": [
+    {
+      "name": "GTMN conflict screen",
+      "approver": "seat",
+      "defined_in": "SKILL.md"
+    }
+  ],
+  "interaction": {
+    "ask_via": "question_card",
+    "default_if_unanswered": "use_recommended"
+  },
+  "outputs": [
+    "md",
+    "docx",
+    "pdf"
+  ],
+  "notes": "Layers are never flattened. spc-kazah supersedes on LATAM regional facts. spc-thiel and fc-pattern-matcher share one source."
+}

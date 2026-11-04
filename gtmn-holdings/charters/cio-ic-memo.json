@@ -1,0 +1,204 @@
+{
+  "id": "cio-ic-memo",
+  "name": "Office of the CIO",
+  "version": "1.0.0",
+  "kind": "firm",
+  "status": "proposed",
+  "summary": "Fiduciary investment office of the LEGACY family office: 10 personas across allocation, private markets, risk, Brazilian macro and manager selection.",
+  "accent": "#1D4ED8",
+  "source": {
+    "plugin": "cio-ic-memo-1.1.0",
+    "agents_dir": "agents",
+    "skills_dir": "skills",
+    "house_dir": "house",
+    "knowledge_dir": "knowledge"
+  },
+  "desk": {
+    "skill": "cio-ic-memo",
+    "modes": [
+      "ic-memo",
+      "refresh-bench"
+    ]
+  },
+  "agents": [
+    {
+      "id": "cio-bookstaber",
+      "role": "Liquidity, Complexity and Survival",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cio-brunel",
+      "role": "Goals-Based, After-Tax, Family-Balance-Sheet Allocation",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cio-ellis",
+      "role": "The Loser's Game, Costs, and Committee Governance",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cio-ilmanen",
+      "role": "Forward Expected Returns and the De-smoothing Test",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cio-lerner",
+      "role": "The Evidence on the Asset Class",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cio-marks",
+      "role": "Cycle Position and Calibrated Aggressiveness",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cio-phalippou",
+      "role": "Return Measurement and the Public-Market Alternative",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cio-seides",
+      "role": "Manager and Fund Selection",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cio-stuhlberger",
+      "role": "The Brazil Read",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cio-swensen",
+      "role": "The Endowment Model as Fiduciary Test",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    }
+  ],
+  "owns": [
+    "whether LEGACY or Delta capital is committed",
+    "portfolio fit",
+    "liquidity and obligations on the family balance sheet"
+  ],
+  "veto": [
+    {
+      "ground": "LEGACY or Delta capital is not committed (its own capital only)"
+    }
+  ],
+  "cannot_veto": [
+    "the deal itself",
+    "anyone else's capital",
+    "legality",
+    "price"
+  ],
+  "pen_default_for": [
+    "commit or do-not-commit memos on LEGACY or Delta capital"
+  ],
+  "senior_panel": [
+    "cio-swensen",
+    "cio-marks",
+    "cio-brunel"
+  ],
+  "signoff_seat": "cio-marks",
+  "always_convened": [
+    {
+      "agent": "cio-bookstaber",
+      "when": "the commitment creates an obligation to pay cash on someone else's schedule"
+    }
+  ],
+  "dispatch": "parallel",
+  "gates": [
+    {
+      "name": "clarifying-questions pause",
+      "approver": "seat",
+      "defined_in": "SKILL.md"
+    }
+  ],
+  "interaction": {
+    "ask_via": "question_card",
+    "default_if_unanswered": "use_recommended"
+  },
+  "outputs": [
+    "md",
+    "docx",
+    "pdf"
+  ],
+  "notes": "Explicit-invocation firm on its own; on the Plenary it is convened only when Rafael's or Delta's capital is in question. cio-swensen is a closed body of work. Shows the two private-markets numbers unreconciled."
+}

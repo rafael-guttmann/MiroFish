@@ -1,0 +1,495 @@
+{
+  "id": "alliance-house",
+  "name": "Alliance House",
+  "version": "1.0.0",
+  "kind": "firm",
+  "status": "proposed",
+  "summary": "Joint-venture and alliance firm: 33 independent personas across nine practice groups, five regional desks and a senior board. Preserves real dissent.",
+  "accent": "#0F766E",
+  "source": {
+    "plugin": "alliance-house-2.1.0",
+    "agents_dir": "agents",
+    "skills_dir": "skills",
+    "house_dir": "house",
+    "knowledge_dir": "knowledge"
+  },
+  "desk": {
+    "skill": "alliance-house",
+    "modes": [
+      "mandate",
+      "refresh-bench"
+    ]
+  },
+  "agents": [
+    {
+      "id": "ah-bamford",
+      "role": "Managing Partner",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-bremmer",
+      "role": "Political-Risk Scoring",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-casey",
+      "role": "Cross-Border Deal Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-claure",
+      "role": "LATAM Market Entry & Distribution",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-damodaran",
+      "role": "Intrinsic Valuation",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-duke",
+      "role": "Thesis & Viability Review Board",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-ernst",
+      "role": "Structural Choice & Venture Design",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-gomes-casseres",
+      "role": "Combination Form & Joint Value",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-hughes-johnson",
+      "role": "Scaling People",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-huntsman",
+      "role": "The Ambassadorial Read",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-kanter",
+      "role": "Collaborative Advantage & Relationship Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-kleinbard",
+      "role": "Cross-Border Tax Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-kling",
+      "role": "Deal-Structure Mechanics",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-kroll",
+      "role": "Counterparty Investigation",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-lemann",
+      "role": "Chairman",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-martin",
+      "role": "Thesis & Viability Review Board",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-mauboussin",
+      "role": "Expectations and Base Rates",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-meyer",
+      "role": "Cross-Cultural Corridor Briefing",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-moore",
+      "role": "Beachhead Selection & the Zone Problem",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-mulally",
+      "role": "Working Together",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-munger",
+      "role": "Thesis & Viability Review Board",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-neumeier",
+      "role": "Positioning & Naming",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-parente",
+      "role": "The Brazil State-Corporate Bridge",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-porat",
+      "role": "Capital Discipline and Funding Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-porter",
+      "role": "Thesis & Viability Review Board",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-rice",
+      "role": "Statecraft for Commercial Decisions",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-roberge",
+      "role": "The Revenue Engine",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-saint-john",
+      "role": "Launch & Cultural Relevance",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-schwarzman",
+      "role": "Vice-Chairman",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-sharp",
+      "role": "Evidence & the Laws of Growth",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-slootman",
+      "role": "Amp It Up",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-ury",
+      "role": "Negotiation Strategy",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ah-voss",
+      "role": "Tactical Negotiation",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    }
+  ],
+  "owns": [
+    "partnership structure",
+    "JV governance",
+    "partner fit",
+    "contribution and control design",
+    "exit mechanics of a partnership",
+    "the Thesis Gate"
+  ],
+  "veto": [
+    {
+      "ground": "a Thesis Gate Kill on a new venture, after the emerging-market correction pass (ah-parente, ah-bremmer) where the venture is state-adjacent or EM"
+    }
+  ],
+  "cannot_veto": [
+    "legality",
+    "price",
+    "whether LEGACY or Delta capital goes in"
+  ],
+  "pen_default_for": [
+    "joint venture",
+    "alliance",
+    "consortium",
+    "cross-border entry with a partner"
+  ],
+  "senior_panel": [
+    "ah-lemann",
+    "ah-schwarzman",
+    "ah-bamford"
+  ],
+  "signoff_seat": "ah-bamford",
+  "always_convened": [
+    {
+      "agent": "ah-parente",
+      "when": "a Kill on a state-adjacent or emerging-market venture"
+    },
+    {
+      "agent": "ah-bremmer",
+      "when": "a Kill on a state-adjacent or emerging-market venture"
+    }
+  ],
+  "dispatch": "parallel",
+  "gates": [
+    {
+      "name": "Thesis Gate",
+      "approver": "seat",
+      "defined_in": "SKILL.md"
+    }
+  ],
+  "interaction": {
+    "ask_via": "question_card",
+    "default_if_unanswered": "use_recommended",
+    "intake_questionnaire": "references/intake-router.md"
+  },
+  "outputs": [
+    "md",
+    "docx",
+    "pdf"
+  ],
+  "notes": "Every structuring recommendation carries at least one unconventional alternative. Negotiation with outside counterparties is this firm's work, not the Plenary's."
+}

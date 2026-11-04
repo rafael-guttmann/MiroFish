@@ -1,0 +1,898 @@
+{
+  "id": "ogc-dg",
+  "name": "OGC DG",
+  "version": "1.0.0",
+  "kind": "firm",
+  "status": "proposed",
+  "summary": "Office of the General Counsel for Delta Global: fifteen practice groups, 66 independent persona agents, four senior partners who review every dispatch, US and Brazilian law.",
+  "accent": "#7A5C3E",
+  "source": {
+    "plugin": "ogc-dg-1.2.0",
+    "agents_dir": "agents",
+    "skills_dir": "skills",
+    "house_dir": "house",
+    "knowledge_dir": "knowledge"
+  },
+  "desk": {
+    "skill": "ogc-dg",
+    "modes": [
+      "dispatch",
+      "refresh-bench"
+    ]
+  },
+  "agents": [
+    {
+      "id": "ogc-adams",
+      "role": "Contract Language",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-bachelder",
+      "role": "Executive Package Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-balduccini",
+      "role": "Brazilian Banking & Finance · Practice Group 10",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-barbosa",
+      "role": "CVM Enforcement Defence · Practice Group 15 — FIDC and Brazilian Receivables Funds",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-barshay",
+      "role": "Negotiation Dynamics and the Competitive Deal",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-bernstein",
+      "role": "Trademark, Brand and Advertising",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-blanchard",
+      "role": "Cross-Border Qualification Mechanics",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-borba",
+      "role": "CVM Regulatory Perimeter · Practice Group 15 — FIDC and Brazilian Receivables Funds",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-born",
+      "role": "International Arbitration Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-brazil-re",
+      "role": "Institutional Composite",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-brazil-ri",
+      "role": "Institutional Composite",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-brennan",
+      "role": "Sales-Based Financing: State Licensing & Usury Perimeter · Practice Group 14",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-breslow",
+      "role": "Fund Formation, Vehicle Economics and Fund Governance",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-bruce",
+      "role": "The Adversary Seat · Practice Group 14 — Merchant Cash Advance and Sales-Based Financing",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-buchheit",
+      "role": "Credit & Distress Mechanics · Practice Group 10",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-carvalhosa",
+      "role": "Doutrina Societária",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-christians",
+      "role": "International Tax Policy & Structural Durability",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-cohen",
+      "role": "Regulatory Feasibility and Deal Architecture (M&A Drafting Lane)",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-demarest",
+      "role": "Senior-Partner Composite",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-determann",
+      "role": "Privacy as Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-dowling",
+      "role": "Cross-Border Employment",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-eizirik",
+      "role": "Senior Partner, Brazilian Doctrine",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-emmerich",
+      "role": "Takeover Practice, Deal Protection and Governance",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-fidc-bcb",
+      "role": "Institutional Composite · Practice Group 15 — FIDC and Brazilian Receivables Funds",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-fisher",
+      "role": "Sales-Based Financing: Disclosure & Drafting Consequence · Practice Group 14",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-fox",
+      "role": "Sponsor-Side M&A, Financing Architecture and Post-Closing Risk",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-fraidin",
+      "role": "Adversarial Structuring and the Attack Surface",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-gunderson",
+      "role": "Standardization, Velocity and the Close",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-herlihy",
+      "role": "Regulated Board Process and Institutional Governance",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-kravitt",
+      "role": "Structured Finance & Securitization · Practice Group 10",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-kupor",
+      "role": "Fund Economics and What the Term Actually Does",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-laster",
+      "role": "Senior Partner, Fiduciary Enforcer",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-lazar",
+      "role": "The Executive's Counsel",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-lee",
+      "role": "IP Enforcement and the Litigation-Proof Instrument",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-lemes",
+      "role": "Brazilian Arbitration",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-lemley",
+      "role": "IP Doctrine and the Economics of Exclusion",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-levy",
+      "role": "The SAFE, Conversion Mechanics and Stacking",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-lipton",
+      "role": "Senior Partner, Strategic Counsel",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-mca-syndication",
+      "role": "Institutional Composite · Practice Group 14 — Merchant Cash Advance and Sales-Based Financing",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-mechanic",
+      "role": "US Commercial Real Estate",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-meeker",
+      "role": "Open Source, Source-Available and Model Licensing",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-mendelsohn",
+      "role": "What the File Looks Like Later",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-miller",
+      "role": "The Going Concern",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-morrison",
+      "role": "Esports, Gaming and Creator Deals",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-nemon",
+      "role": "Merchant Cash Advance: Agreement Architecture · Practice Group 14",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-nyag",
+      "role": "Institutional Composite · Practice Group 14 — Merchant Cash Advance and Sales-Based Financing",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-paiva",
+      "role": "Sponsor-Side Origination & the Consultor Perimeter · Practice Group 15 — FIDC and Brazilian Receivables Funds",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-passman",
+      "role": "Music Economics and Royalty Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-peck",
+      "role": "The Brazilian Regime Is Its Own Regime",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-pessoa",
+      "role": "Fund Regulamento & Cota Architecture · Practice Group 15 — FIDC and Brazilian Receivables Funds",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-pinheiro-neto",
+      "role": "Senior-Partner Composite",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-poerio",
+      "role": "ERISA, § 409A, § 280G and Equity Compliance",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-quiroga",
+      "role": "Brazilian Tax",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-saeed",
+      "role": "Strategic Transaction Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-salles-toledo",
+      "role": "The Adversary Seat on Isolation · Practice Group 15 — FIDC and Brazilian Receivables Funds",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-sonsini",
+      "role": "Senior Judgment, Venture & Governance Architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-sprayregen",
+      "role": "Strategic Chapter 11",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-stark",
+      "role": "Deal Translation and Concept Selection",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-strine",
+      "role": "Doctrinal Authority, Delaware Fiduciary Law",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-sullivan",
+      "role": "Appellate Reasoning and Dispute Strategy",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-taku",
+      "role": "Market Defaults & Drafting Mechanics",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-terra",
+      "role": "Cessão, Isolation & the Civil-Law True Sale · Practice Group 15 — FIDC and Brazilian Receivables Funds",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-wang",
+      "role": "Standardization, Proportionality and the Growth-Stage View",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-white",
+      "role": "Senior Partner, Regulatory and Enforcement Conscience",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-willens",
+      "role": "US Corporate & Transactional Tax",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "ogc-wolff",
+      "role": "Integrity, Verification and Compliance in Media, Entertainment and Sports",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    }
+  ],
+  "owns": [
+    "legality",
+    "enforceability",
+    "regulatory perimeter",
+    "liability",
+    "tax structuring",
+    "drafting of instruments"
+  ],
+  "veto": [
+    {
+      "ground": "the proposal cannot be done lawfully"
+    },
+    {
+      "ground": "the instrument will not be enforceable as drafted"
+    }
+  ],
+  "cannot_veto": [
+    "whether the deal is worth doing",
+    "price",
+    "commercial terms within the law"
+  ],
+  "pen_default_for": [
+    "instruments",
+    "redlines",
+    "disputes",
+    "regulatory questions"
+  ],
+  "senior_panel": [
+    "ogc-lipton",
+    "ogc-laster",
+    "ogc-white",
+    "ogc-eizirik"
+  ],
+  "signoff_seat": "ogc-laster",
+  "always_convened": [
+    {
+      "agent": "ogc-adams",
+      "when": "any instrument is drafted or redlined (the language gate)"
+    },
+    {
+      "agent": "ogc-kravitt",
+      "when": "US origination and a Brazilian funding vehicle in the same mandate"
+    }
+  ],
+  "dispatch": "parallel",
+  "gates": [
+    {
+      "name": "Jurisdiction Gate, including the receivables branch",
+      "approver": "seat",
+      "defined_in": "SKILL.md"
+    }
+  ],
+  "interaction": {
+    "ask_via": "question_card",
+    "default_if_unanswered": "use_recommended",
+    "intake_questionnaire": "references/intake-router.md"
+  },
+  "outputs": [
+    "md",
+    "docx",
+    "pdf"
+  ],
+  "notes": "Brazilian supersession rule applies. Max four practice groups per mandate on its own; the Plenary's seat cap governs on joint mandates."
+}

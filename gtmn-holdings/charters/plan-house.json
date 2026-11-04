@@ -1,0 +1,295 @@
+{
+  "id": "plan-house",
+  "name": "Plan House",
+  "version": "1.0.0",
+  "kind": "firm",
+  "status": "proposed",
+  "summary": "Business-plan firm: 19 blind personas and two desks research, author and audit a plan for a go/no-go decision on the principal's own capital.",
+  "accent": "#4F46E5",
+  "source": {
+    "plugin": "plan-house-1.0.1_1",
+    "agents_dir": "agents",
+    "skills_dir": "skills",
+    "house_dir": "house",
+    "knowledge_dir": "knowledge"
+  },
+  "desk": {
+    "skill": "plan-house",
+    "modes": [
+      "decision-memo",
+      "full-plan",
+      "checkpoint"
+    ]
+  },
+  "agents": [
+    {
+      "id": "bp-aulet",
+      "role": "The Plan House · Group 1 — Plan architecture",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-bhide",
+      "role": "The Plan House · Group 7 — The adversaries",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-blank",
+      "role": "The Plan House · Group 7 — The adversaries",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-bryar-carr",
+      "role": "The Plan House · Group 5 — The document",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-cagan",
+      "role": "The Plan House · Group 3 — Operations, product and people",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-dornelas",
+      "role": "The Plan House · Regional desk",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-fitzpatrick",
+      "role": "The Plan House · Group 2 — Research bench",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-flyvbjerg",
+      "role": "The Plan House · Group 2 — Research bench",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-gilad",
+      "role": "The Plan House · Group 2 — Research bench",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-goldratt",
+      "role": "The Plan House · Group 3 — Operations, product and people",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-mcgrath",
+      "role": "The Plan House · Group 1 — Plan architecture",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-minto",
+      "role": "The Plan House · Group 5 — The document",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-osterwalder",
+      "role": "The Plan House · Group 6 — Format and test plan",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-ramanujam",
+      "role": "The Plan House · Group 4 — Commercial",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-research-desk",
+      "role": "The Plan House · Group 2 — Research bench",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-rumelt",
+      "role": "The Plan House · Group 1 — Plan architecture",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-sahlman",
+      "role": "The Plan House · Group 1 — Plan architecture",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-scenario-desk",
+      "role": "The Plan House · Group 2 — Research bench",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "bp-wasserman",
+      "role": "The Plan House · Group 3 — Operations, product and people",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    }
+  ],
+  "dispatch": "parallel",
+  "interaction": {
+    "ask_via": "question_card",
+    "default_if_unanswered": "wait",
+    "intake_questionnaire": "skills/plan-house/references/intake-questionnaire.md"
+  },
+  "outputs": [
+    "md",
+    "docx",
+    "pdf",
+    "xlsx"
+  ],
+  "senior_panel": [
+    "bp-sahlman"
+  ],
+  "signoff_seat": "bp-sahlman",
+  "owns": [
+    "business-plan authoring and audit",
+    "assumption register",
+    "go/no-go decision memo"
+  ],
+  "may_borrow_from": [
+    "dg-ib",
+    "ogc-dg",
+    "cio-ic-memo",
+    "spc-deal-team"
+  ],
+  "gates": [
+    {
+      "name": "Instrument gate",
+      "approver": "rafael",
+      "defined_in": "skills/plan-house/SKILL.md"
+    }
+  ],
+  "notes": "Black-and-white deliverables in a senior bank or consulting partner's register. Two archetype desks: bp-research-desk, bp-scenario-desk."
+}

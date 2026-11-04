@@ -1,0 +1,349 @@
+{
+  "id": "marketing-house",
+  "name": "Marketing House",
+  "version": "1.0.0",
+  "kind": "firm",
+  "status": "proposed",
+  "summary": "Marketing, brand and design firm: 23 practitioner personas and 2 desks guide the brief through ten approval gates, with 2 to 3 options at each.",
+  "accent": "#EA580C",
+  "source": {
+    "plugin": "marketing-house",
+    "agents_dir": "agents",
+    "skills_dir": "skills"
+  },
+  "desk": {
+    "skill": "marketing-house",
+    "modes": [
+      "brief",
+      "gates"
+    ]
+  },
+  "agents": [
+    {
+      "id": "mh-albers",
+      "role": "Colour lab",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-anadol",
+      "role": "Generative imagery lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-berger",
+      "role": "Word-of-mouth lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-bierut",
+      "role": "Identity process and presentation",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-binet-field",
+      "role": "Effectiveness and media lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-curtis",
+      "role": "Token architecture lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-duarte",
+      "role": "Horizontal documents lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-frost",
+      "role": "Design-system product lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-guanaes",
+      "role": "Brazil creative (business)",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-karten",
+      "role": "Social strategy lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-kotler",
+      "role": "Marketing-mix lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-milhazes",
+      "role": "Colour, pattern and rhythm",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-ogilvy",
+      "role": "Copy chief",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-olivetto",
+      "role": "Brazil creative (popular)",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-pollard",
+      "role": "Brief lead (chair, G0)",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-production-desk",
+      "role": "Production desk",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-research-desk",
+      "role": "Research desk",
+      "model": "inherit",
+      "tools": [
+        "WebSearch",
+        "WebFetch"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-ritson",
+      "role": "Strategy chair",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-scher",
+      "role": "Identity lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-spiekermann",
+      "role": "Typography lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-sutherland",
+      "role": "Behavioural strategy",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-tufte",
+      "role": "Vertical documents and data lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-vaynerchuk",
+      "role": "Content and attention lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-vignelli",
+      "role": "System auditor",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    },
+    {
+      "id": "mh-walsh",
+      "role": "Art direction lead",
+      "model": "inherit",
+      "tools": [
+        "Read",
+        "Write"
+      ],
+      "blind": true
+    }
+  ],
+  "dispatch": "layered",
+  "interaction": {
+    "ask_via": "question_card",
+    "default_if_unanswered": "wait",
+    "intake_questionnaire": "skills/marketing-house/references/ladder.yaml"
+  },
+  "outputs": [
+    "md",
+    "docx",
+    "pdf",
+    "pptx",
+    "html"
+  ],
+  "signoff_seat": "mh-pollard",
+  "senior_panel": [
+    "mh-pollard"
+  ],
+  "owns": [
+    "brand, marketing strategy, creative and design systems",
+    "delivery pack and templates"
+  ],
+  "gates": [
+    {
+      "name": "G0 Guided brief",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    },
+    {
+      "name": "G1 Research and insight",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    },
+    {
+      "name": "G2 Strategy and positioning",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    },
+    {
+      "name": "G3 Marketing mix",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    },
+    {
+      "name": "G4 Channel, media and social",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    },
+    {
+      "name": "G5 Creative direction",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    },
+    {
+      "name": "G6 Identity and design system",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    },
+    {
+      "name": "G7 Templates",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    },
+    {
+      "name": "G8 Delivery pack",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    },
+    {
+      "name": "G9 Claude install",
+      "approver": "rafael",
+      "defined_in": "skills/marketing-house/references/ladder.yaml"
+    }
+  ],
+  "notes": "Release A: conversational gates, no image generation, no spending. Stops at every gate and waits for Rafael."
+}

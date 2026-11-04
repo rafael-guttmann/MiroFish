@@ -17,7 +17,7 @@
   };
   TH.shared = { fl: ["carpet", "#d6d8de", "#caccd4"], wall: "#2a2f3a", trim: "#c9a24a", desk: ["#e4e6ea", "#b4b8c2"], chair: "#2a2f3a", acc: "mug", deco: ["board", "clock", "window", "board"], lounge: [["sofa", 8, 200, "#475569"], ["plant", 150, 196]], rug: ["#2a2f3a", "#c9a24a"] };
   const MIN_AGENTS = 10;
-  const PARTNERS = new Set("ogc-eizirik ogc-laster ogc-demarest ogc-lipton ah-bamford ah-schwarzman ah-lemann bp-rumelt bp-sahlman dgib-rohatyn dgib-quattrone dgib-wasserstein cio-marks cio-swensen cio-ellis spc-thiel spc-wilson managing-partner cto-larson dani mh-ogilvy mh-olivetto mh-vignelli".split(" "));
+  const PARTNERS = new Set("ah-bamford ah-lemann ah-schwarzman bp-sahlman cio-brunel cio-marks cio-swensen dgib-cohen dgib-rohatyn dgib-wasserstein managing-partner mh-pollard ogc-eizirik ogc-laster ogc-lipton ogc-white spc-moritz spc-neumann spc-thiel spc-wilson cto-larson dani".split(" "));
   const DECO_X = [6, 38, 142, 174];
   const BOARD_TH = { fl: ["checker", "#2a2d36", "#252831"], wall: "#16181D", trim: "#c9a24a", desk: ["#3b2a1d", "#2a1d13"], chair: "#111", deco: [], rug: ["#7a1f2b", "#c9a24a"] };
   let raf = 0, room = "plenary", g = null;

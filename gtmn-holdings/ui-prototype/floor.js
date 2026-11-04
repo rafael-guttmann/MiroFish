@@ -70,13 +70,16 @@
     [[48, 4], [76, 100], [212, 12]].forEach(([y, h]) => R(208, y, 4, h, wallC));
     R(208, 76, 4, 68, "#9fd3e6"); R(209, 76, 1, 68, "#d9f2fb");
     R(212, 144, 108, 4, wallC);
+    for (let x = 214; x < 320; x += 12) { R(x, 41, 10, 7, mix(f.accent, "#000000", .55)); R(x, 41, 10, 1, "#c9a24a"); }
+    R(212, 48, 108, 1, "#c9a24a"); R(212, 48, 2, 96, "#c9a24a"); R(318, 48, 2, 96, "#c9a24a");
+    [232, 266, 300].forEach(x => { R(x - 1, 44, 2, 6, "#c9a24a"); R(x - 4, 50, 8, 3, "#ffe9a8"); R(x - 2, 53, 4, 1, "#fff6d8"); });
     R(206, 50, 8, 2, f.accent); R(206, 76, 8, 2, f.accent); R(206, 174, 8, 2, f.accent); R(206, 212, 8, 2, f.accent);
     // wall sign + war room banner
     const nm = f.name.toUpperCase().slice(0, 17), sw = tw(nm) + 12;
     R(104 - sw / 2 - 1, 9, sw + 2, 15, "#0b0c10"); R(104 - sw / 2, 10, sw, 13, f.accent); T(nm, 104 - tw(nm) / 2, 14, "#fff");
     R(104 - sw / 2, 25, sw, 1, th.trim);
     R(214, 4, 106, 36, mix(f.accent, "#101216", .35)); R(214, 40, 106, 1, f.accent);
-    pill("WAR ROOM", 250, 41, f.accent, "#fff");
+    pill("MEETING ROOM", 266, 41, "#c9a24a", "#1b1305");
     pill("PARTNERS", 235, 151, "#c9a24a", "#1b1305");
     // door mats
     R(194, 56, 12, 16, mix(f.accent, "#000000", .1)); R(194, 180, 12, 28, mix(f.accent, "#000000", .1));
@@ -147,7 +150,7 @@
     host.innerHTML = `<div class="fl-bar" id="flbar"></div>
       <div class="fl-hud" id="flhud"></div>
       <div class="fl-wrap" id="flwrap"><div class="fl-stage" id="flstage"><canvas id="flcv" width="${W}" height="${H}" aria-label="Pixel office floor"></canvas><i class="fl-crt"></i></div><div class="fl-tip" id="fltip" hidden></div></div>
-      <p class="fl-legend"><b>!</b> asking you &nbsp;·&nbsp; <b>…</b> working &nbsp;·&nbsp; <b>WAR ROOM</b> kickoff &nbsp;·&nbsp; <b>PARTNERS</b> review &nbsp;·&nbsp; tap any character</p>`;
+      <p class="fl-legend"><b>!</b> asking you &nbsp;·&nbsp; <b>…</b> working &nbsp;·&nbsp; <b>desk</b> working alone &nbsp;·&nbsp; <b>MEETING ROOM</b> 5+ working together &nbsp;·&nbsp; <b>PARTNERS</b> approvals &nbsp;·&nbsp; <b>bench</b> idle &nbsp;·&nbsp; tap any character</p>`;
     const cv = host.querySelector("#flcv"), wrap = host.querySelector("#flwrap"), stage = host.querySelector("#flstage"), tip = host.querySelector("#fltip"), bar = host.querySelector("#flbar"), hud = host.querySelector("#flhud");
     const main = cv.getContext("2d"); main.imageSmoothingEnabled = false;
     let scale = 2, sel = null, cur = null, last = performance.now(), lastSync = -1e9, t0 = performance.now();
@@ -225,17 +228,22 @@
         r.counts = { board: ids.length };
         return;
       }
-      const ph = r.phase = Math.floor((t - t0) / PH_MS) % 3;
       const all = f.agents.map(a => ({ a, st: api.state(f.id, a.id) }));
-      const work = all.filter(o => o.st !== "idle"), bench = all.filter(o => o.st === "idle");
+      const act = all.filter(o => o.st !== "idle");
+      const away = api.convened().includes(f.id) && act.length ? act[0] : null;
+      const work = act.filter(o => o !== away), bench = all.filter(o => o.st === "idle");
+      const team = work.filter(o => o.st !== "asking").length > 4;
       const want = new Map(); let m = 0, p = 0, desk = 0;
       r.desks.forEach(d => d.on = 0);
       work.slice(0, 12).forEach((o, i) => {
         let spot = r.desks[i].spot; r.desks[i].on = 1;
-        if (o.st !== "asking") { if (ph === 0 && m < 8) spot = r.meet[m++]; else if (ph === 2 && p < 3 && m === 0) spot = r.part[p++]; }
+        if (o.st === "asking" && /approv|partner|review/i.test(api.task(f.id, o.a.id) || "") && p < 5) spot = r.part[p++];
+        else if (team && o.st !== "asking" && m < 8) spot = r.meet[m++];
         if (spot === r.desks[i].spot) desk++;
         want.set(o.a.id, { o, spot });
       });
+      r.mode = team ? "Team meeting" : work.length ? "Solo work" : "Quiet";
+      r.phase = 0;
       bench.slice(0, 9).forEach((o, i) => want.set(o.a.id, { o, spot: r.idle[i] }));
       [...r.agents.keys()].forEach(id => { if (!want.has(id)) r.agents.delete(id); });
       want.forEach(({ o, spot }, id) => {
@@ -244,7 +252,7 @@
         a.st = o.st; a.task = api.task(f.id, id);
         if (spot !== a.spot && spot !== a.pending) { if (a.moving) a.pending = spot; else go(a, spot); }
       });
-      r.counts = { war: m, par: p, desk, bench: bench.length, work: work.length, more: Math.max(0, work.length - 12), benchMore: Math.max(0, bench.length - 9) };
+      r.counts = { away: away ? 1 : 0, war: m, par: p, desk, bench: bench.length, work: work.length, more: Math.max(0, work.length - 12), benchMore: Math.max(0, bench.length - 9) };
     }
 
     /* ----- drawing ----- */
@@ -307,7 +315,7 @@
     function updateHud(r) {
       const f = r.firm, c = r.counts, names = ["Kickoff", "Drafting", "Review"];
       if (r.isBoard) { hud.innerHTML = `<span class="fl-tag" style="--a:#16181D">PLENARY</span><span>${c.board} firms at the table</span><span>one fact ledger · blind positions</span>`; }
-      else hud.innerHTML = `<span class="fl-tag" style="--a:${f.accent}">${f.name.toUpperCase()}</span><span class="fl-ph">${c.work ? names[r.phase] : "Quiet"}</span><span>WAR ROOM <b>${c.war || 0}</b></span><span>PARTNERS <b>${c.par || 0}</b></span><span>DESKS <b>${c.desk || 0}</b></span><span>BENCH <b>${c.bench || 0}</b></span>${c.more || c.benchMore ? `<span class="fl-more">+${(c.more || 0) + (c.benchMore || 0)} more off-screen</span>` : ""}`;
+      else hud.innerHTML = `<span class="fl-tag" style="--a:${f.accent}">${f.name.toUpperCase()}</span><span class="fl-ph">${r.mode}</span><span>MEETING <b>${c.war || 0}</b></span><span>PARTNERS <b>${c.par || 0}</b></span><span>AT PLENARY <b>${c.away || 0}</b></span><span>DESKS <b>${c.desk || 0}</b></span><span>BENCH <b>${c.bench || 0}</b></span>${c.more || c.benchMore ? `<span class="fl-more">+${(c.more || 0) + (c.benchMore || 0)} more off-screen</span>` : ""}`;
       drawBar();
     }
     function drawBar() {
@@ -328,7 +336,7 @@
     cv.addEventListener("click", ev => {
       const a = pick(ev); sel = a;
       if (!a) { tip.hidden = true; return; }
-      const r = rooms[room], fm = r.isBoard ? a.rep : r.firm, where = r.isBoard ? "at the boardroom table" : a.sit ? (a.spot.dir === "u" || r.meet.includes(a.spot) ? "in the war room" : r.part.includes(a.spot) ? "in the partners room" : "at their desk") : a.st === "idle" ? "on the bench" : "on the way";
+      const r = rooms[room], fm = r.isBoard ? a.rep : r.firm, where = r.isBoard ? "at the boardroom table" : a.sit ? (a.spot.dir === "u" || r.meet.includes(a.spot) ? "in the meeting room" : r.part.includes(a.spot) ? "in the partners room" : "at their desk") : a.st === "idle" ? "on the bench" : "on the way";
       const s = a.st === "asking" ? "asking you" : a.st === "idle" ? "on the bench" : "working";
       tip.innerHTML = `<b>${a.name}</b><small>${fm.name} · ${s} · ${where}</small><p>${a.task && a.st !== "idle" ? a.task : "Nothing right now."}</p>${a.st === "asking" ? '<button class="send" data-go="needs">Answer</button>' : ""}${!r.isBoard ? '<button class="ghost" data-go="agent">Open in Office</button>' : ""}`;
       tip.hidden = false; tip.dataset.f = fm.id; tip.dataset.a = a.id;

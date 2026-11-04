@@ -8,7 +8,7 @@
   const initials = n => n.replace(/[^A-Za-zÀ-ÿ ]/g, "").split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, sel: new Set(), state: {}, task: {}, convened: ["gtmn-cto", "dani", "spc-deal-team"] };
+  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, work: null, workBy: "firm", open: new Set(), sel: new Set(), state: {}, task: {}, convened: ["gtmn-cto", "dani", "spc-deal-team"] };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
   const firmAgents = f => f.agents.map(a => ({ ...a, st: S.state[f.id + "/" + a.id] }));
@@ -32,6 +32,8 @@
     { id: 7, t: "Family office allocation memo", f: "cio-ic-memo", col: "wait", p: 0 },
     { id: 8, t: "Technical review of the Plenary plugin", f: "gtmn-cto", col: "done", p: 1 },
     { id: 9, t: "Credit portfolio review, Q3", f: "zencredit-firm", col: "done", p: 1 },
+    { id: 10, t: "Brand refresh for Orbit Labs", f: "marketing-house", col: "work", p: .5 },
+    { id: 11, t: "Plan House: unit economics deep dive", f: "plan-house", col: "work", p: .8 },
   ];
   const fl = id => id === "plenary" ? PLENARY : byId[id];
 
@@ -118,13 +120,65 @@
     });
   }
 
-  /* BOARD */
-  function board() {
-    const cols = [["wait", "Waiting"], ["work", "Working"], ["need", "Needs you"], ["done", "Done"]];
-    return `${header("Board", "Every demand, from waiting to done.")}<div class="board">${cols.map(([k, n]) => {
-      const l = jobs.filter(j => j.col === k);
-      return `<section class="col"><h2><span>${n}</span><span>${l.length}</span></h2><div class="list">${l.map(j => { const f = fl(j.f); return `<button class="job" data-job="${j.id}" style="--a:${f.accent === "#FFFFFF" ? "#16181D" : f.accent}"><b>${esc(j.t)}</b><div class="meta"><i></i>${esc(f.name)}</div>${k === "work" ? `<div class="bar"><span style="transform:scaleX(${j.p})"></span></div>` : ""}</button>`; }).join("")}</div></section>`;
-    }).join("")}</div>`;
+  /* WORK */
+  const STG = {
+    def: ["Brief", "Research", "Draft", "Review", "Delivery"],
+    "plan-house": ["Intake", "Research", "Assumption register", "Audit", "Decision memo"],
+    "ogc-dg": ["Intake", "Analysis", "Drafting", "Partner review", "Your approval"],
+    "gtmn-cto": ["Brief", "Blind reads", "Synthesis", "Build pack"],
+    "marketing-house": ["Insight", "Strategy", "Creative", "Identity", "Delivery pack"],
+    "zencredit-firm": ["Data check", "Modelling", "Draft", "Review", "Publish"],
+    plenary: ["Mandate", "Fact ledger", "Blind positions", "Cross-exam", "Decision memo"],
+  };
+  const DOES = ["Read the brief and set the scope", "Pulled sources and logged the key facts", "Wrote a first pass of its section", "Checked the numbers against the ledger", "Flagged two risks for the partner", "Rewrote the weakest part after review"];
+  const WORKERS = j => j.f === "plenary" ? S.convened.map(id => ({ name: byId[id].name, f: byId[id] })) : byId[j.f].agents.map(a => ({ name: a.name, f: byId[j.f], id: a.id }));
+  function detail(j) {
+    const names = STG[j.f] || STG.def, n = names.length, pool = WORKERS(j), f = fl(j.f);
+    const cur = j.p >= 1 ? n : Math.min(n - 1, Math.floor(j.p * n));
+    const stages = names.map((nm, i) => {
+      const st = i < cur ? "done" : i === cur ? (j.col === "need" ? "ask" : j.col === "wait" ? "next" : "now") : "next";
+      const who = [0, 1].map(k => pool[(j.id * 3 + i * 2 + k) % pool.length]);
+      const steps = st === "next" ? [] : who.map((w, k) => ({ w, what: DOES[(i * 2 + k + j.id) % DOES.length], t: st === "done" ? `${9 + i}:${k ? "40" : "05"}` : "now" }));
+      return { nm, st, who, steps };
+    });
+    const tally = {}; stages.forEach(s => s.steps.forEach(x => tally[x.w.name] = (tally[x.w.name] || 0) + 1));
+    const people = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    return { stages, cur, people, f, now: stages[cur], next: stages.filter(s => s.st === "next") };
+  }
+  const STL = { wait: "Waiting to start", work: "Working", need: "Needs you", done: "Done" };
+  function work() {
+    if (S.work) return workDetail(jobs.find(j => j.id === S.work));
+    const by = S.workBy, c = k => jobs.filter(j => j.col === k).length;
+    const row = j => { const d = detail(j), f = d.f, ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
+      return `<button class="wrow" data-work="${j.id}" style="--a:${ac}"><span class="wt"><b>${esc(j.t)}</b><small>${by === "firm" ? "" : esc(f.name) + " · "}${j.col === "done" ? "Finished" : j.col === "wait" ? "Queued" : esc(d.now.nm)}</small></span>
+      <span class="seg" aria-hidden="true">${d.stages.map(s => `<i class="${s.st}"></i>`).join("")}</span><span class="pc">${Math.round(j.p * 100)}%</span><span class="st ${j.col}">${STL[j.col]}</span></button>`; };
+    const groups = by === "firm" ? [...FIRMS.map(x => [x, jobs.filter(j => j.f === x.id)]), [PLENARY, jobs.filter(j => j.f === "plenary")]].filter(g => g[1].length).sort((a, b) => b[1].length - a[1].length || 0)
+      : ["need", "work", "wait", "done"].map(k => [{ name: STL[k], accent: "#16181D" }, jobs.filter(j => j.col === k)]).filter(g => g[1].length);
+    return `${header("Work", "What every firm is doing. Tap one to go deeper.")}
+    <div class="wsum"><div><b>${c("work")}</b><small>working</small></div><div><b class="n">${c("need")}</b><small>need you</small></div><div><b>${c("wait")}</b><small>waiting</small></div><div><b>${c("done")}</b><small>done</small></div></div>
+    <div class="routes" style="margin-bottom:14px"><button class="chip" data-wby="firm" aria-pressed="${by === "firm"}">By firm</button><button class="chip" data-wby="status" aria-pressed="${by === "status"}">By status</button></div>
+    ${groups.map(([g, l]) => `<section class="wgroup"><h2><i style="background:${g.accent === "#FFFFFF" ? "#16181D" : g.accent}"></i>${esc(g.name)} · ${l.length}</h2>${l.map(row).join("")}</section>`).join("")}`;
+  }
+  function ring(p, ac) { const r = 42, c = 2 * Math.PI * r; return `<svg class="ring" viewBox="0 0 100 100" role="img" aria-label="${Math.round(p * 100)} percent complete"><circle cx="50" cy="50" r="${r}" fill="none" stroke="#E3DFD6" stroke-width="10"/><circle cx="50" cy="50" r="${r}" fill="none" stroke="${ac}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c * p} ${c}" transform="rotate(-90 50 50)"/><text x="50" y="55" text-anchor="middle" font-size="22" font-weight="700" fill="#16181D">${Math.round(p * 100)}%</text></svg>`; }
+  function workDetail(j) {
+    const d = detail(j), f = d.f, ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent, max = Math.max(1, ...d.people.map(p => p[1]));
+    const who = d.now ? d.now.who : [];
+    const card = cards.find(c => c.job === j.id);
+    return `<div class="crumbs"><button data-wback="1">Work</button> / ${esc(j.t)}</div>
+    <div class="wdet" style="--a:${ac}">
+      <div class="whead"><div><span class="st ${j.col}">${STL[j.col]}</span><h1>${esc(j.t)}</h1><p class="sub">${esc(f.name)}${j.col !== "done" && j.col !== "wait" ? " · now: " + esc(d.now.nm) : ""}</p></div>${ring(j.p, ac)}</div>
+      ${card ? `<button class="needbar" data-goneeds="1"><b>${esc(card.agent)} is waiting for you</b><span>${esc(card.q)}</span><em>Answer →</em></button>` : ""}
+      <h2>Progress</h2>
+      <ol class="steps">${d.stages.map((s, i) => `<li class="${s.st}"><i>${s.st === "done" ? "✓" : i + 1}</i><span>${esc(s.nm)}</span></li>`).join("")}</ol>
+      <div class="wcols">
+        <div><h2>Who is working</h2>${j.col === "done" ? `<p class="sub">Everyone has finished.</p>` : j.col === "wait" ? `<p class="sub">Nobody yet. It starts when a desk is free.</p>` : who.map(w => `<button class="desk" ${w.id ? `data-openagent="${w.f.id}/${w.id}"` : ""}>${pawn(w.f, w.name, "working")}<div><b>${esc(w.name)}</b><small class="state-work">${esc(d.now.nm)}</small></div></button>`).join("")}</div>
+        <div><h2>Who did the most</h2>${d.people.length ? d.people.map(([n, v]) => `<div class="hb"><span>${esc(n)}</span><div><i style="width:${v / max * 100}%"></i></div><b>${v}</b></div>`).join("") : `<p class="sub">Nothing yet.</p>`}</div>
+      </div>
+      <h2>Step by step</h2>
+      <div class="tl">${d.stages.map((s, i) => `<div class="tstage ${s.st}"><button class="th" data-stage="${j.id}:${i}" aria-expanded="${S.open.has(j.id + ":" + i)}"><i></i><b>${esc(s.nm)}</b><small>${s.st === "done" ? "Done" : s.st === "now" ? "In progress" : s.st === "ask" ? "Waiting for you" : "Next"}</small></button>
+        ${S.open.has(j.id + ":" + i) ? `<div class="tb">${s.steps.length ? s.steps.map(x => `<div class="ts">${pawn(f, x.w.name, "")}<div><b>${esc(x.w.name)}</b> <small>${x.t}</small><p>${esc(x.what)}</p></div></div>`).join("") : `<p class="sub">Not started. ${esc(s.who.map(w => w.name).join(" and "))} will take it.</p>`}</div>` : ""}</div>`).join("")}</div>
+      ${d.next.length && j.col !== "done" ? `<h2>What comes next</h2><ul class="nx">${d.next.slice(0, 3).map((s, i) => `<li><b>${esc(s.nm)}</b><small>${esc(s.who[0].name)}${i === 0 && j.col !== "wait" ? " · after the current step" : ""}</small></li>`).join("")}</ul>` : ""}
+    </div>`;
   }
 
   /* NEEDS YOU */
@@ -179,7 +233,7 @@
 
   function render() {
     const m = $("#main");
-    m.innerHTML = { office, floor, board, needs, new: newDemand }[S.tab]();
+    m.innerHTML = { office, floor, board: work, needs, new: newDemand }[S.tab]();
     document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === S.tab));
     const b = $("#badge"); b.textContent = cards.length || ""; b.dataset.n = cards.length;
     renderAside();
@@ -223,12 +277,17 @@
 
   document.addEventListener("click", e => {
     const t = e.target.closest("button"); if (!t) return;
-    if (t.dataset.tab) { S.tab = t.dataset.tab; if (S.tab === "office") { S.firm = null; S.agent = null; } render(); }
+    if (t.dataset.tab) { S.tab = t.dataset.tab; if (S.tab === "board") S.work = null; if (S.tab === "office") { S.firm = null; S.agent = null; } render(); }
     else if (t.dataset.firm && S.tab === "office") { S.firm = t.dataset.firm; S.agent = null; S.showAll = false; render(); }
     else if (t.dataset.agent) { S.agent = t.dataset.agent; render(); }
     else if (t.dataset.back) { if (t.dataset.back === "b") S.firm = null; S.agent = null; render(); }
     else if (t.dataset.showall) { S.showAll = true; render(); }
     else if (t.dataset.goneeds) { S.tab = "needs"; render(); }
+    else if (t.dataset.work) { S.work = +t.dataset.work; S.open = new Set([S.work + ":" + detail(jobs.find(j => j.id === S.work)).cur]); render(); $("#main").scrollTop = 0; }
+    else if (t.dataset.wback) { S.work = null; render(); }
+    else if (t.dataset.wby) { S.workBy = t.dataset.wby; render(); }
+    else if (t.dataset.stage) { S.open.has(t.dataset.stage) ? S.open.delete(t.dataset.stage) : S.open.add(t.dataset.stage); const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; }
+    else if (t.dataset.openagent) { const [ff, aa] = t.dataset.openagent.split("/"); S.tab = "office"; S.firm = ff; S.agent = aa; render(); }
     else if (t.dataset.job) { const j = jobs.find(x => x.id == t.dataset.job); if (j.col === "need") { S.tab = "needs"; const i = cards.findIndex(c => c.job === j.id); if (i > 0) cards.unshift(...cards.splice(i, 1)); render(); } }
   });
 
@@ -241,7 +300,7 @@
     if (S.state[k] === "working") S.task[k] = "Drafting its section of the mandate";
     if (Math.random() < .6) say(f.id, f.name, `${a.name} ${lines[Math.floor(Math.random() * lines.length)]}`);
     jobs.forEach(j => { if (j.col === "work") j.p = Math.min(.95, j.p + .02); });
-    if (S.tab === "office" || S.tab === "board") { const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; }
+    if (S.tab === "office" || (S.tab === "board" && !S.work)) { const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; }
   }, 4500);
 
   render();

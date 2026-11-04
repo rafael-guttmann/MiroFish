@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "kind": "firm",
   "status": "proposed",
-  "summary": "Rafael's technology office: three blind persona seats under an orchestrating desk. Evaluates, analyses and creates; a Create mandate yields an executable Build Pack.",
+  "summary": "Office of the CTO, GTMN Holdings' technology office: three blind persona seats under an orchestrating desk. Evaluates, analyses and creates; a Create mandate yields an executable Build Pack.",
   "accent": "#2F6FED",
   "source": {
     "plugin": "gtmn-cto-1.0.0",
@@ -13,11 +13,55 @@
     "house_dir": "house",
     "knowledge_dir": "knowledge"
   },
-  "desk": {"skill": "gtmn-cto", "modes": ["evaluate", "analyse", "create", "build"]},
+  "desk": {
+    "skill": "gtmn-cto",
+    "modes": [
+      "evaluate",
+      "analyse",
+      "create",
+      "build"
+    ]
+  },
   "agents": [
-    {"id": "cto-majors", "role": "Production, operability, validation stack", "model": "opus", "tools": ["Read", "Write", "WebSearch", "WebFetch", "Bash"], "blind": true},
-    {"id": "cto-willison", "role": "Trust boundary, agent security, test discipline", "model": "opus", "tools": ["Read", "Write", "WebSearch", "WebFetch", "Bash"], "blind": true},
-    {"id": "cto-larson", "role": "Strategy and architecture", "model": "opus", "tools": ["Read", "Write", "WebSearch", "WebFetch", "Bash"], "blind": true}
+    {
+      "id": "cto-majors",
+      "role": "Production, operability, validation stack",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cto-willison",
+      "role": "Trust boundary, agent security, test discipline",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    },
+    {
+      "id": "cto-larson",
+      "role": "Strategy and architecture",
+      "model": "opus",
+      "tools": [
+        "Read",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Bash"
+      ],
+      "blind": true
+    }
   ],
   "owns": [
     "technical evaluation of products, repos, vendors and agents",
@@ -31,15 +75,34 @@
     "capital allocation (cio-ic-memo)",
     "legal instruments (ogc-dg)"
   ],
-  "pen_default_for": ["evaluate", "analyse", "create"],
+  "pen_default_for": [
+    "evaluate",
+    "analyse",
+    "create"
+  ],
   "always_convened": [
-    {"agent": "cto-majors", "when": "every Evaluate, Analyse and Create mandate"}
+    {
+      "agent": "cto-majors",
+      "when": "every Evaluate, Analyse and Create mandate"
+    }
   ],
   "dispatch": "parallel",
   "gates": [
-    {"name": "Phase gate: security and test discipline", "approver": "seat", "defined_in": "skills/build/SKILL.md"},
-    {"name": "Phase gate: operability", "approver": "seat", "defined_in": "skills/build/SKILL.md"},
-    {"name": "Decisions marked as Rafael's in the Build Pack", "approver": "rafael", "defined_in": "skills/gtmn-cto/references/build-pack.md"}
+    {
+      "name": "Phase gate: security and test discipline",
+      "approver": "seat",
+      "defined_in": "skills/build/SKILL.md"
+    },
+    {
+      "name": "Phase gate: operability",
+      "approver": "seat",
+      "defined_in": "skills/build/SKILL.md"
+    },
+    {
+      "name": "Decisions marked as Rafael's in the Build Pack",
+      "approver": "rafael",
+      "defined_in": "skills/gtmn-cto/references/build-pack.md"
+    }
   ],
   "interaction": {
     "ask_via": "question_card",
@@ -47,6 +110,9 @@
     "intake_questionnaire": "skills/gtmn-cto/references/intake-questionnaire.md"
   },
   "may_borrow_from": [],
-  "outputs": ["md", "code"],
+  "outputs": [
+    "md",
+    "code"
+  ],
   "notes": "The desk never writes a seat's section. Build phase runs in Claude Code against a target repo; reviewers must not receive the builder's transcript."
 }

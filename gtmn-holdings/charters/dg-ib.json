@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "kind": "firm",
   "status": "proposed",
-  "summary": "Delta Global's investment bank: six product groups, 17 personas, three senior partners and an enforced modelling standard that can stop delivery.",
+  "summary": "DG-IB, the investment bank operating on behalf of GTMN Holdings: six product groups, 17 personas, three senior partners and an enforced modelling standard that can stop delivery.",
   "accent": "#B45309",
   "source": {
     "plugin": "dg-ib-1.1.0",

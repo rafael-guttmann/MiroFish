@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "kind": "firm",
   "status": "proposed",
-  "summary": "Analysis firm for a merchant cash advance book: six functional seats delivering portfolio reviews, noteholder and IC packs, with a methodology walkthrough.",
+  "summary": "Analysis firm operating on behalf of ZenCredit: six functional seats delivering merchant cash advance portfolio reviews, noteholder and IC packs, with a methodology walkthrough.",
   "accent": "#15803D",
   "source": {
     "plugin": "zencredit-firm-1.7.0",

@@ -10,7 +10,7 @@
     4: "101101111001001", 5: "111100110001110", 6: "011100111101111", 7: "111001010010010", 8: "111101111101111", 9: "111101111001110",
     "-": "000000111000000", ".": "000000000000010", "+": "000010111010000", "!": "010010010000010", "&": "010101010101011", "/": "001001010100100", ":": "000010000010000", " ": "000000000000000"
   };
-  const SHORT = { "ogc-dg": "OGC", "alliance-house": "ALLIANCE", "plan-house": "PLAN", "dg-ib": "DG-IB", "cio-ic-memo": "CIO", "spc-deal-team": "SPC", "zencredit-firm": "ZEN", "gtmn-cto": "CTO", dani: "DANI" };
+  const SHORT = { "ogc-dg": "OGC", "alliance-house": "ALLIANCE", "plan-house": "PLAN", "dg-ib": "DG-IB", "cio-ic-memo": "CIO", "spc-deal-team": "SPC", "zencredit-firm": "ZEN", "gtmn-cto": "CTO", "marketing-house": "MKT", dani: "DANI" };
   const SKIN = ["#f1c27d", "#e0ac69", "#c68642", "#8d5524", "#ffdbac"], HAIR = ["#2b1b12", "#5a3825", "#a5612b", "#d9b45a", "#1a1a1a", "#8a8a8a"];
   const TH = {
     "ogc-dg": { fl: ["parquet", "#8a5a34", "#74492a"], wall: "#33241b", trim: "#c9a24a", desk: ["#6b4426", "#4e301b"], chair: "#5a1620", acc: "lamp", deco: ["books", "scales", "frame", "books"], lounge: [["sofa", 8, 200, "#5a1620"], ["globe", 150, 196]], rug: ["#7a1f2b", "#c9a24a"] },
@@ -21,6 +21,7 @@
     "spc-deal-team": { fl: ["concrete", "#9b9ca3", "#8c8d94"], wall: "#8a4036", trim: "#BE123C", desk: ["#dcb67e", "#b68f58"], chair: "#2b2d38", acc: "sticker", deco: ["neon", "board", "neon", "board"], lounge: [["bean", 10, 204, "#BE123C"], ["bean", 34, 210, "#f59e0b"], ["kegs", 148, 196]], rug: ["#2b2d38", "#BE123C"], brick: 1 },
     "zencredit-firm": { fl: ["tech", "#1d2b27", "#25362f"], wall: "#0e1d17", trim: "#15803D", desk: ["#46544e", "#2f3b36"], chair: "#0e1d17", acc: "mug", deco: ["chart", "chart", "chart", "chart"], lounge: [["sofa", 8, 200, "#14532d"], ["plant", 150, 196]], rug: ["#15803d", "#0e1d17"] },
     "gtmn-cto": { fl: ["tech", "#1a2233", "#222c42"], wall: "#0e1526", trim: "#2F6FED", desk: ["#2a3248", "#1b2133"], chair: "#0e1526", acc: "can", deco: ["rack", "rack", "rack", "board"], lounge: [["bean", 10, 204, "#2F6FED"], ["bean", 34, 210, "#6b7280"], ["plant", 150, 196]], rug: ["#2F6FED", "#0e1526"] },
+    "marketing-house": { fl: ["carpet", "#f6e7d4", "#ecd7bd"], wall: "#fff3e6", trim: "#EA580C", desk: ["#fffaf2", "#d9c3a5"], chair: "#EA580C", acc: "roll", deco: ["board", "frame", "neon", "board"], lounge: [["bean", 10, 204, "#EA580C"], ["bean", 34, 210, "#0EA5E9"], ["plant", 150, 196]], rug: ["#EA580C", "#fde68a"] },
     dani: { fl: ["wood", "#c49a6c", "#b58b5c"], wall: "#4a2c4a", trim: "#C026D3", desk: ["#e8c9a0", "#c3a27a"], chair: "#C026D3", acc: "mug", deco: ["shelf", "frame", "window", "shelf"], lounge: [["sofa", 8, 200, "#C026D3"], ["plant", 150, 196]], rug: ["#C026D3", "#f5d0fe"] }
   };
   const DECO_X = [6, 38, 142, 174];

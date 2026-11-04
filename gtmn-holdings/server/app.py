@@ -13,7 +13,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from runner import AgentSDKRunner, SimulatedRunner
+import render
 from store import Store
+from urllib.parse import parse_qs
 
 HERE = Path(__file__).parent
 _env = HERE / ".env"
@@ -109,6 +111,9 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/library":
             return self.send(200, {"docs": store.rows("SELECT * FROM docs ORDER BY id DESC"),
                                    "design_systems": store.rows("SELECT * FROM design_systems ORDER BY id")})
+        m = re.fullmatch(r"/api/docs/(\d+)/file", p)
+        if m:
+            return self.docfile(int(m[1]), parse_qs(urlparse(self.path).query))
         if p == "/api/stream":
             return self.stream()
         self.send(404, {"error": "not found"})
@@ -188,6 +193,36 @@ class H(BaseHTTPRequestHandler):
                 time.sleep(1)
         except (BrokenPipeError, ConnectionResetError):
             pass
+
+    def docfile(self, did, q):
+        d = store.one("SELECT * FROM docs WHERE id=?", (did,))
+        fmt = (q.get("format") or ["PDF"])[0]
+        if d and fmt == "text":
+            f = HERE / "data" / "vault" / f"job-{d['job']}" / "decision-memo.md"
+            return self.send(200, f.read_bytes(), "text/plain; charset=utf-8") if f.is_file() else self.send(404, {"error": "no source"})
+        if not d or fmt not in render.BUILD:
+            return self.send(404, {"error": "not found"})
+        vault = HERE / "data" / "vault" / f"job-{d['job']}"
+        src = vault / "decision-memo.md"
+        if not src.is_file():
+            return self.send(404, {"error": "no source file for this deliverable yet"})
+        mime, ext = render.MIME[fmt]
+        out = vault / f"deliverable.{ext}"
+        if not out.is_file() or out.stat().st_mtime < src.stat().st_mtime:
+            try:
+                out.write_bytes(render.BUILD[fmt](d["name"], src.read_text()))
+            except Exception as e:
+                return self.send(500, {"error": f"render failed: {type(e).__name__}"})
+        slug = re.sub(r"[^A-Za-z0-9]+", "-", d["name"]).strip("-")[:60] or "deliverable"
+        body = out.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Content-Length", str(len(body)))
+        disp = "inline" if q.get("inline") else "attachment"
+        self.send_header("Content-Disposition", f'{disp}; filename="{slug}.{ext}"')
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(body)
 
     def static(self, p):
         rel = "index.html" if p in ("", "/") else p.lstrip("/")

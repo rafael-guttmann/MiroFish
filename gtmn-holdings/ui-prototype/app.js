@@ -247,7 +247,7 @@
   }
 
   /* LIBRARY */
-  const dl = (d, fmt) => { const ext = FMT[fmt], nm = `${d.name.replace(/[^\w]+/g, "-")}-v${d.ver}.${ext}`; const b = new Blob([`GTMN Holdings sample file\n${d.name}\nVersion ${d.ver}\nFormat: ${fmt}\nThis is a prototype placeholder.`], { type: "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = nm; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 500); toast("Downloading " + nm); };
+  const dl = (d, fmt) => { if (live && /^d\d+$/.test(d.id)) { const a = document.createElement("a"); a.href = `/api/docs/${d.id.slice(1)}/file?format=${fmt}`; document.body.appendChild(a); a.click(); a.remove(); return toast("Downloading " + fmt); } const ext = FMT[fmt], nm = `${d.name.replace(/[^\w]+/g, "-")}-v${d.ver}.${ext}`; const b = new Blob([`GTMN Holdings sample file\n${d.name}\nVersion ${d.ver}\nFormat: ${fmt}\nThis is a prototype placeholder.`], { type: "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = nm; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 500); toast("Downloading " + nm); };
   const fmtPicker = d => `<div class="fpick"><b>Which formats?</b><div class="fchips">${Object.keys(FMT).map(k => `<button class="chip" data-fmt="${k}" aria-pressed="${S.fmtSel.has(k)}">${k}</button>`).join("")}</div><button class="submit sm" data-fmtok="${d.id}" ${S.fmtSel.size ? "" : "disabled"}>${d.fmts.length ? "Add formats" : "Confirm"}</button></div>`;
   function docRow(d) {
     const j = jobs.find(x => x.id === d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
@@ -450,7 +450,7 @@
     else if (t.dataset.pv) pvOpen(t.dataset.pv);
     else if (t.dataset.pvk) pvOpen(S.pv.id, t.dataset.pvk);
     else if (t.dataset.pvx) pvClose();
-    else if (t.dataset.pvdl) { const [id, k] = t.dataset.pvdl.split(":"), d = docs.find(x => x.id === id); if (d.fmts.includes(k)) dl(d, k); else { d.fmts.push(k); toast(`Asked the desk to also make it in ${k}.`); } pvOpen(id, k); }
+    else if (t.dataset.pvdl) { const [id, k] = t.dataset.pvdl.split(":"), d = docs.find(x => x.id === id); if (d.fmts.includes(k) || (live && /^d\d+$/.test(d.id))) dl(d, k); else { d.fmts.push(k); toast(`Asked the desk to also make it in ${k}.`); } pvOpen(id, k); }
     else if (t.dataset.pvsteer) { const jid = +t.dataset.pvsteer; pvClose(); S.tab = "board"; S.work = jid; S.open = new Set([jid + ":" + detail(jobs.find(j => j.id === jid)).cur]); render(); $("#main").scrollTop = 0; }
     else if (t.dataset.dl) { const [id, k] = t.dataset.dl.split(":"); dl(docs.find(x => x.id === id), k); }
     else if (t.dataset.dlall) { toast("Preparing one zip with every file (sample in this prototype)."); }
@@ -465,6 +465,16 @@
   /* PREVIEW */
   const PVF = ["PDF", "Word", "PowerPoint", "Excel", "JPEG"];
   const pvSec = d => [["Summary", d.why], ["Key findings", "Three points that matter most for the decision, each with its source and a confidence level."], ["Recommendation", "The desk's recommended path, the main risks, and what would change the answer."], ["Next steps", "Who does what next, with owners and dates."]];
+  const real = d => live && /^d\d+$/.test(d.id);
+  const mdHtml = t => esc(t).replace(/^#{1,3} (.*)$/gm, "<h4>$1</h4>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/^[-*] (.*)$/gm, "• $1").replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>");
+  function pvReal(d, k, host) {
+    const u = `/api/docs/${d.id.slice(1)}/file?format=${k}&inline=1`;
+    if (k === "PDF") return host.innerHTML = `<iframe class="pv-frame" src="${u}" title="PDF preview"></iframe>`;
+    if (k === "JPEG") return host.innerHTML = `<img class="pv-real" src="${u}" alt="JPEG preview">`;
+    fetch(`/api/docs/${d.id.slice(1)}/file?format=text`).then(r => r.text()).then(t => {
+      if (S.pv && S.pv.k === k && S.pv.id === d.id) host.innerHTML = `<div class="pv-page"><p>${mdHtml(t.slice(0, 6000))}</p></div><p class="pv-n">Text view of the real content. Download for the full ${k} file.</p>`;
+    }).catch(() => {});
+  }
   function pvBody(d, k) {
     const j = jobs.find(x => x.id === d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent, S4 = pvSec(d);
     if (k === "PowerPoint") return `<div class="pv-slides">${[["", d.name, f.name + " · " + d.at], ...S4.map(s => [s[0], s[1], ""])].map((s, i) => `<div class="pv-slide" style="--a:${ac}"><small>${i + 1}</small>${s[0] ? `<h4>${esc(s[0])}</h4>` : ""}<b>${esc(s[1])}</b>${s[2] ? `<p>${esc(s[2])}</p>` : ""}</div>`).join("")}</div>`;
@@ -482,6 +492,7 @@
       <p class="pv-note">${have.includes(k) ? "" : `Not made yet in ${k}. This shows how it would look. `}Sample preview: the real file is shown here once the firm has produced it.</p>
       <div class="pv-body">${pvBody(d, k)}</div>
       <div class="pv-f"><button class="submit" data-pvdl="${d.id}:${k}">${have.includes(k) ? "Download " + k : "Make it in " + k}</button><button class="chip" data-pvsteer="${d.job}">Steer this</button></div></div>`;
+    if (real(d)) { const pb = el.querySelector(".pv-body"); pb.innerHTML = ""; el.querySelector(".pv-note").textContent = "This is the real file the firm produced."; el.querySelector("[data-pvdl]").textContent = "Download " + k; pvReal(d, k, pb); }
     el.classList.add("on"); const c = el.querySelector("[data-pvx]"); if (c) c.focus();
   }
   const pvClose = () => { const el = $("#pv"); if (el) el.classList.remove("on"); S.pv = null; };

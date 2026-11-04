@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Question card",
+  "description": "The one format every agent uses when it needs Rafael. The UI renders it; the runtime pauses the agent until an answer arrives.",
+  "type": "object",
+  "required": ["id", "firm", "agent", "kind", "question"],
+  "properties": {
+    "id": {"type": "string"},
+    "firm": {"type": "string"},
+    "agent": {"type": "string"},
+    "job_id": {"type": "string"},
+    "kind": {"enum": ["choose_one", "choose_many", "approve", "file"]},
+    "question": {"type": "string", "maxLength": 200},
+    "options": {
+      "type": "array", "minItems": 2, "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["label", "description"],
+        "properties": {
+          "label": {"type": "string"},
+          "description": {"type": "string"},
+          "recommended": {"type": "boolean"}
+        }
+      }
+    },
+    "why": {"type": "string"},
+    "if_unanswered": {"type": "string", "description": "What the team will do by default, shown on the card."},
+    "allow_freeform": {"const": true, "description": "The open answer box is always present."}
+  }
+}

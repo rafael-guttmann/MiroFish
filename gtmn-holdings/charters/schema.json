@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GTMN firm charter card",
+  "description": "Machine-readable ID card for one GTMN firm. Superset of the Plenary charter template (owns, veto, cannot_veto, pen_default_for, senior_panel, signoff_seat, always_convened, dispatch, gate) plus the runtime fields the Holdings platform needs.",
+  "type": "object",
+  "required": ["id", "name", "version", "kind", "status", "summary", "source", "desk", "agents", "owns", "dispatch", "interaction"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+    "name": {"type": "string"},
+    "version": {"type": "string"},
+    "kind": {"enum": ["firm", "service", "persona"]},
+    "status": {"enum": ["proposed", "approved"], "description": "Only Rafael sets approved."},
+    "summary": {"type": "string"},
+    "accent": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "description": "Office UI colour."},
+    "source": {
+      "type": "object",
+      "required": ["plugin", "agents_dir", "skills_dir"],
+      "additionalProperties": false,
+      "properties": {
+        "plugin": {"type": "string"},
+        "agents_dir": {"type": "string"},
+        "skills_dir": {"type": "string"},
+        "house_dir": {"type": "string"},
+        "knowledge_dir": {"type": "string"}
+      }
+    },
+    "desk": {
+      "type": "object",
+      "required": ["skill"],
+      "additionalProperties": false,
+      "properties": {
+        "skill": {"type": "string", "description": "Skill that orchestrates the firm; the runtime's entrypoint."},
+        "modes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "role"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "role": {"type": "string"},
+          "model": {"type": "string"},
+          "tools": {"type": "array", "items": {"type": "string"}},
+          "blind": {"type": "boolean", "description": "True if the agent must never see siblings' output; enforced by isolated contexts."}
+        }
+      }
+    },
+    "owns": {"type": "array", "items": {"type": "string"}},
+    "veto": {
+      "type": "array",
+      "items": {"type": "object", "required": ["ground"], "properties": {"ground": {"type": "string"}}}
+    },
+    "cannot_veto": {"type": "array", "items": {"type": "string"}},
+    "pen_default_for": {"type": "array", "items": {"type": "string"}},
+    "senior_panel": {"type": "array", "items": {"type": "string"}},
+    "signoff_seat": {"type": "string"},
+    "always_convened": {
+      "type": "array",
+      "items": {"type": "object", "required": ["agent", "when"], "properties": {"agent": {"type": "string"}, "when": {"type": "string"}}}
+    },
+    "dispatch": {"enum": ["parallel", "layered", "single"]},
+    "layers": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "approver"],
+        "properties": {"name": {"type": "string"}, "approver": {"enum": ["rafael", "seat"]}, "defined_in": {"type": "string"}}
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "description": "How the firm talks to Rafael. All asks go through question cards.",
+      "required": ["ask_via", "default_if_unanswered"],
+      "additionalProperties": false,
+      "properties": {
+        "ask_via": {"const": "question_card"},
+        "default_if_unanswered": {"enum": ["use_recommended", "wait", "skip"]},
+        "intake_questionnaire": {"type": "string"}
+      }
+    },
+    "may_borrow_from": {"type": "array", "items": {"type": "string"}, "description": "Firm ids whose seats this firm may call."},
+    "tools_runtime": {"type": "array", "items": {"type": "string"}, "description": "Executable assets (scripts, data) that must ship with the firm."},
+    "outputs": {"type": "array", "items": {"enum": ["md", "docx", "pdf", "html", "xlsx", "pptx", "code"]}},
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"max_usd_per_run": {"type": "number"}, "max_parallel_agents": {"type": "integer"}}
+    },
+    "notes": {"type": "string"}
+  }
+}

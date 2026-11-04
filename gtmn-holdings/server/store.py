@@ -38,6 +38,11 @@ class Store:
         self.lock = threading.RLock()
         with self.lock:
             self.db.executescript(SCHEMA)
+            for col in ("src TEXT", "why TEXT"):
+                try:
+                    self.db.execute(f"ALTER TABLE docs ADD COLUMN {col}")
+                except sqlite3.OperationalError:
+                    pass
             self.db.commit()
 
     def run(self, sql, args=()):

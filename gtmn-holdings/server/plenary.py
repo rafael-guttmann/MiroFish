@@ -197,10 +197,8 @@ def run(r, job_id):
         (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Verification ({verdict})\n\n{ver}\n\n## Sources consulted\n\n" + "\n".join(f"- {v}: {k}" for k, v in sources.items()) + f"\n\n---\n## Plenary file\n\n### Blind positions\n\n{v1}\n\n### Cross-examination\n\n{v2}\n")
         fmts = j["formats"]
         s.run("UPDATE jobs SET status='done', progress=1, stage=4 WHERE id=?", (job_id,))
-        s.run("INSERT INTO docs(job,name,kind,by,formats,created) VALUES(?,?,?,?,?,?)", (job_id, title, "Plenary decision memo (verified: " + verdict + ")", "plenary-chair", fmts, time.time()))
+        r._deliver(job_id, firm, title, memo, verdict, "plenary-chair", json.loads(fmts))
         s.event("done", f"Plenary closed with {len(seats)} seats from {len(fids)} firms. Memo is in the Library.", job_id, firm)
-        if not json.loads(fmts):
-            r.sim._ask_formats(job_id, firm)
     except Exception as e:
         s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
         s.event("error", f"Plenary stopped: {type(e).__name__}: {str(e)[:160]}", job_id, firm)

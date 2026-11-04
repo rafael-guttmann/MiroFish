@@ -232,7 +232,7 @@ class H(BaseHTTPRequestHandler):
         d = store.one("SELECT * FROM docs WHERE id=?", (did,))
         fmt = (q.get("format") or ["PDF"])[0]
         if d and fmt in ("text", "Markdown"):
-            f = HERE / "data" / "vault" / f"job-{d['job']}" / "decision-memo.md"
+            f = HERE / "data" / "vault" / f"job-{d['job']}" / (d.get("src") or "decision-memo.md")
             if not f.is_file():
                 return self.send(404, {"error": "no source"})
             if fmt == "text":
@@ -249,11 +249,11 @@ class H(BaseHTTPRequestHandler):
         if not d or fmt not in render.BUILD:
             return self.send(404, {"error": "not found"})
         vault = HERE / "data" / "vault" / f"job-{d['job']}"
-        src = vault / "decision-memo.md"
+        src = vault / (d.get("src") or "decision-memo.md")
         if not src.is_file():
             return self.send(404, {"error": "no source file for this deliverable yet"})
         mime, ext = render.MIME[fmt]
-        out = vault / f"deliverable.{ext}"
+        out = vault / f"{src.stem}.{ext}"
         if not out.is_file() or out.stat().st_mtime < src.stat().st_mtime:
             try:
                 out.write_bytes(render.BUILD[fmt](d["name"], src.read_text()))

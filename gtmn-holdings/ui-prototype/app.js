@@ -517,7 +517,7 @@
     const docOf = job => (lb.docs.find(d => d.job === job) || {}).id;
     jobs = js.map(j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, live: 1 }));
     cards = cs.map(c => { const p = c.payload, f = byId[c.firm]; return { id: "c" + c.id, srv: c.id, job: c.job, firm: c.firm, agent: f ? f.agents[0].name : "Plenary Chair", kind: p.kind, q: p.q, opts: p.opts, why: p.why, def: p.def, fmtDoc: p.q.startsWith("Which formats") ? "d" + docOf(c.job) : undefined }; });
-    docs = lb.docs.map(d => ({ id: "d" + d.id, job: d.job, name: d.name, type: d.kind, why: "Produced for this demand.", by: agName(d.by), ver: d.version, fmts: JSON.parse(d.formats || "[]"), st: "final", at: when(d.created) }));
+    docs = lb.docs.map(d => ({ id: "d" + d.id, job: d.job, name: d.name, type: d.kind, why: d.why || "Produced for this demand.", by: agName(d.by), ver: d.version, fmts: JSON.parse(d.formats || "[]"), st: "final", at: when(d.created) }));
     if (lb.design_systems.length) stds = lb.design_systems.map(s => ({ id: "s" + s.id, name: s.name, kind: s.kind === "link" ? "Link" : "File", url: s.url, def: s.is_default, scope: "All firms", at: when(s.created) }));
     Object.keys(S.state).forEach(k => { S.state[k] = "idle"; });
     jobs.forEach(j => { const f = byId[j.f]; if (!f || (j.col !== "work" && j.col !== "need")) return; f.agents.slice(0, 4).forEach(a => { S.state[f.id + "/" + a.id] = j.col === "need" ? "asking" : "working"; S.task[f.id + "/" + a.id] = "Working on: " + j.t; }); });

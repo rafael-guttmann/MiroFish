@@ -141,17 +141,81 @@ class AgentSDKRunner(Runner):
             txt = txt.split("---", 2)[2]
         return txt.strip()[:30000] + "\n\nYou work for GTMN Holdings. Answer in plain prose. You see only what is given below."
 
-    def _verify(self, job_id, firm, memo, sources):
-        self._stage(job_id, firm, 4, 5, "Verifier is checking every claim in the memo")
-        ver = self._say("You are the independent verifier. You did not write this memo. Check its factual claims (names, dates, numbers, quotes, product capabilities, legal citations) using web_search and web_fetch. Output only the markdown, with no narration before it: a table | Claim | Verdict (VERIFIED / UNVERIFIED / CONTRADICTED) | Evidence and URL |, then a one-line overall verdict. Do not soften a CONTRADICTED claim.",
+    VERIFIER = ("You are the independent verifier. You did not write this memo. Output only markdown, no narration before it: "
+                "a table | Claim | Verdict | Evidence and URL |, then one line 'Overall: ...'.\n"
+                "Verdicts: VERIFIED, UNVERIFIED, CONTRADICTED, or OUT OF SCOPE.\n"
+                "OUT OF SCOPE (list them, they are not scored): names of the persona seats and of the firms, Rafael and GTMN Holdings, "
+                "figures that come from Rafael's own books or portfolio (marked as client data, or that no public source could hold), "
+                "hypotheticals, and the seats' recommendations or judgements.\n"
+                "Everything else public is in scope: statutes, decrees, tax rates and thresholds, regulator rules, case law, dates, market facts, product facts.\n"
+                "Rules for law, tax and regulation: fetch the primary text with web_fetch (official gazette, statute, regulator or court site) "
+                "or, if that is blocked, a law-firm or Big Four note that cites the instrument. Check (a) the figure itself, (b) the effective date, "
+                "(c) the taxpayer category it applies to (individual vs company, resident vs non-resident, loan vs receivables purchase), and "
+                "(d) that it applies to the transaction as the memo uses it. A real figure applied to the wrong category or transaction is CONTRADICTED, "
+                "and you say which category applies. Quote the operative number and its source in Evidence. "
+                "Never state a corrected figure you did not read in a fetched source; if you cannot confirm the right figure, mark UNVERIFIED and say what to ask counsel.")
+
+    def _verify(self, job_id, firm, memo, sources, stage=4, of=5):
+        self._stage(job_id, firm, stage, of, "Verifier is checking every claim against primary sources")
+        ver = self._say(self.VERIFIER,
                         f"Memo to verify:\n\n{memo}\n\nSources the authors already consulted:\n" + "\n".join(f"- {v} {k}" for k, v in sources.items()),
-                        3000, True, sources, job_id, "Verifier")
-        rows = [l for l in ver.splitlines() if l.startswith("|")]
-        bad = sum("CONTRADICTED" in l.upper() for l in rows)
-        flags = sum("UNVERIFIED" in l.upper() for l in rows)
+                        5000, True, sources, job_id, "Verifier", deep=True)
+        bad = flags = 0
+        for l in ver.splitlines():
+            if l.startswith("|"):
+                cells = [c.strip().strip("*").upper() for c in l.strip().strip("|").split("|")]
+                v = cells[1] if len(cells) > 1 else ""
+                bad += v.startswith("CONTRADICTED")
+                flags += v.startswith("UNVERIFIED")
         verdict = "FAIL" if bad else ("PASS WITH FLAGS" if flags else "PASS")
         self.s.event("verify", f"Verification result: {verdict}", job_id, firm)
         return ver, verdict
+
+    DOC_FORMATS = ("Word", "PDF", "Excel", "PowerPoint", "JPEG", "Markdown")
+
+    def _deliver(self, job_id, firm, title, memo, verdict, by, requested):
+        """The desk decides which deliverables this mandate needs and the best format for each.
+        The decision memo is always first; extra reports are written from the verified memo."""
+        s = self.s
+        vault = self.root / "server" / "data" / "vault" / f"job-{job_id}"
+        plan = []
+        try:
+            raw = self._say("You are the delivery desk. Decide which deliverables this mandate needs and the best format for each. "
+                            "The first is always the decision memo itself. Add up to three more only if a different audience or purpose needs it "
+                            "(a model or schedule of numbers, a deck for a committee, a term sheet or checklist, a one-page visual). Do not pad. "
+                            "Best format: Word for text a person will edit or sign; PDF for a final read-only document; Excel for any model, schedule or tables of numbers; "
+                            "PowerPoint for a committee or board presentation; JPEG for a one-page visual summary; Markdown for notes or hand-over for other tools. Reply with JSON only.",
+                            f"Mandate: {title}\n\nVerified memo:\n{memo[:7000]}\n\nReturn {{\"deliverables\": [{{\"name\": short title, \"kind\": e.g. Memo|Model|Deck|Checklist|Summary, "
+                            f"\"format\": one of {list(self.DOC_FORMATS)}, \"why\": one sentence on why this format, \"brief\": what it must contain}}]}}", 1200)
+            plan = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])["deliverables"]
+        except Exception:
+            plan = []
+        plan = [p for p in plan if isinstance(p, dict) and p.get("format") in self.DOC_FORMATS][:4]
+        if not plan:
+            plan = [{"name": title, "kind": "Memo", "format": "PDF", "why": "A final read-only document.", "brief": ""}]
+        main = plan[0]
+        main_fmts = requested or [main["format"]]
+        self._ids = getattr(self, "_ids", {})
+        rows = [(title, f"Decision memo (verified: {verdict})", main_fmts, main.get("why", ""), "decision-memo.md")]
+        extras = plan[1:]
+        out = {}
+
+        def write(i, p):
+            out[i] = self._say("You write one deliverable for GTMN Holdings from a verified decision memo. Use only facts in the memo; do not add new facts. "
+                               "Markdown. Put numbers in markdown tables so they can become a spreadsheet; use '## ' headings, one per slide, if it is a deck. Under 900 words.",
+                               f"Deliverable: {p['name']} ({p.get('kind', '')})\nMust contain: {p.get('brief', '')}\n\nVerified memo:\n{memo}", 2600)
+        ts = [threading.Thread(target=write, args=(i, p)) for i, p in enumerate(extras)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+        for i, p in enumerate(extras):
+            if out.get(i):
+                fn = f"report-{i + 1}.md"
+                (vault / fn).write_text(f"# {p['name']}\n\n{out[i]}\n\n---\nDerived from the decision memo (verification: {verdict}).\n")
+                rows.append((p["name"], f"{p.get('kind', 'Report')} (from the verified memo)", [p["format"]], p.get("why", ""), fn))
+        for name, kind, fmts, why, src in rows:
+            s.run("INSERT INTO docs(job,name,kind,by,formats,created,src,why) VALUES(?,?,?,?,?,?,?,?)",
+                  (job_id, name, kind, by, json.dumps(fmts), time.time(), src, why))
+        s.event("deliver", "Deliverables: " + "; ".join(f"{n} as {', '.join(f)}" for n, _, f, _, _ in rows), job_id, firm)
 
     def _persona(self, seat):
         txt = (self.root / "firms" / "gtmn-cto" / "agents" / f"{seat}.md").read_text()
@@ -163,10 +227,14 @@ class AgentSDKRunner(Runner):
              {"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": 4},
              {"type": "code_execution_20250522", "name": "code_execution"}]
 
-    def _say(self, system, user, max_tokens=1800, tools=False, sources=None, job_id=None, who=""):
+    DEEP_TOOLS = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 10},
+                  {"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": 10},
+                  {"type": "code_execution_20250522", "name": "code_execution"}]
+
+    def _say(self, system, user, max_tokens=1800, tools=False, sources=None, job_id=None, who="", deep=False):
         msgs = [{"role": "user", "content": user}]
-        for _ in range(6):
-            kw = {"tools": self.TOOLS} if tools else {}
+        for _ in range(10 if deep else 6):
+            kw = {"tools": (self.DEEP_TOOLS if deep else self.TOOLS)} if tools else {}
             r = self.client.beta.messages.create(model=self.model, max_tokens=max_tokens, system=system,
                                                  messages=msgs, betas=["web-fetch-2025-09-10", "code-execution-2025-05-22"], **kw)
             for b in r.content:
@@ -229,21 +297,14 @@ class AgentSDKRunner(Runner):
             steer = "\n".join(self.notes.get(job_id, []))
             memo = self._say("You are the orchestrating desk of the Office of the CTO at GTMN Holdings. Write a decision memo in a senior consulting partner's register: answer first, then reasoning, preserved dissent, risks, next steps. Markdown, under 900 words.",
                              f"Mandate: {title}\n\nBlind positions:\n{positions}\n\nRafael's decision: {answer}\n\nRafael's steering notes (apply them): {steer or 'none'}", 2600)
-            self._stage(job_id, firm, 3, 5, "Verifier is checking every claim in the memo")
-            ver = self._say("You are the independent verifier for the Office of the CTO. You did not write this memo. Check its factual claims (names, dates, numbers, quotes, product capabilities) using web_search and web_fetch. Output markdown: a table | Claim | Verdict (VERIFIED / UNVERIFIED / CONTRADICTED) | Evidence and URL |, then a one-line overall verdict: PASS, PASS WITH FLAGS, or FAIL. Do not soften a CONTRADICTED claim.",
-                            f"Memo to verify:\n\n{memo}\n\nSources the authors already consulted:\n" + "\n".join(f"- {v} {k}" for k, v in sources.items()),
-                            3000, True, sources, job_id, "Verifier")
-            verdict = "FAIL" if "FAIL" in ver.split("verdict")[-1].upper()[:80] else ("PASS WITH FLAGS" if "FLAGS" in ver.upper()[-300:] else "PASS")
-            s.event("verify", f"Verification result: {verdict}", job_id, firm)
+            ver, verdict = self._verify(job_id, firm, memo, sources, 3, 4)
             vault = self.root / "server" / "data" / "vault" / f"job-{job_id}"
             vault.mkdir(parents=True, exist_ok=True)
             (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Blind positions\n\n{positions}\n\n---\n## Verification ({verdict})\n\n{ver}\n\n## Sources consulted\n\n" + "\n".join(f"- {v}: {k}" for k, v in sources.items()) + "\n")
             fmts = j["formats"]
             s.run("UPDATE jobs SET status='done', progress=1, stage=3 WHERE id=?", (job_id,))
-            s.run("INSERT INTO docs(job,name,kind,by,formats,created) VALUES(?,?,?,?,?,?)", (job_id, title, "Decision memo (verified: " + verdict + ")", "cto-desk", fmts, time.time()))
+            self._deliver(job_id, firm, title, memo, verdict, "cto-desk", json.loads(fmts))
             s.event("done", "Memo is in the vault and the Library.", job_id, firm)
-            if not json.loads(fmts):
-                self.sim._ask_formats(job_id, firm)
         except Exception as e:
             s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
             s.event("error", f"Run stopped: {type(e).__name__}: {str(e)[:160]}", job_id, firm)

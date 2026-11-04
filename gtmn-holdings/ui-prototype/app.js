@@ -206,12 +206,16 @@
   }
   const thr = j => S.thread[j.id] || (S.thread[j.id] = []);
   const msgHtml = (m, j) => `<div class="msg ${m.me ? "me" : ""}">${m.me ? "" : pawn(fl(j.f), fl(j.f).name, "")}<div><small>${m.me ? "You" : esc(fl(j.f).name) + " desk"} · ${m.t}</small><p>${esc(m.text)}${m.typing ? '<span class="dots"><i></i><i></i><i></i></span>' : ""}</p>${(m.files || []).map(x => `<span class="fchip">${esc(x)}</span>`).join("")}</div></div>`;
+  const EMPTY = `<div class="st-empty"><b>Nothing sent yet</b><span>Change the scope, add a request, or attach a file or design system. The desk reads it and adjusts. Steps already finished stay as they are.</span></div>`;
   function steerBox(j) {
     const t = thr(j), sug = ["Use our brand guide", "Make it shorter", "Add a risk lens", "Also give me Excel"];
-    return `<div class="steer"><h2>Steer this work</h2><div id="thread" class="thread">${t.length ? t.map(m => msgHtml(m, j)).join("") : `<p class="sub">Add a note, a file or a change at any time. The desk reads it and adjusts. Finished steps stay.</p>`}</div>
-      <div class="sug">${sug.map(s => `<button class="chip" data-sug="${esc(s)}">${esc(s)}</button>`).join("")}</div>
-      <div id="pend" class="pend"></div>
-      <div class="comp"><label class="att" title="Attach a file or design system"><svg viewBox="0 0 24 24"><path d="M20 11l-8 8a5 5 0 01-7-7l8-8a3.5 3.5 0 015 5l-8 8a2 2 0 01-3-3l7-7"/></svg><input type="file" id="sfile" multiple hidden></label><textarea id="snote" rows="1" placeholder="Change something, add a request, or attach a design system…"></textarea><button class="send" id="ssend" disabled>Send</button></div></div>`;
+    const empty = EMPTY;
+    return `<section class="steer" aria-label="Steer this work"><div class="st-h"><h2>Steer this work</h2><span>Send a change at any time</span></div>
+      <div id="thread" class="thread">${t.length ? t.map(m => msgHtml(m, j)).join("") : empty}</div>
+      <div class="comp2"><div class="sug" role="group" aria-label="Quick changes">${sug.map(s => `<button class="chip" data-sug="${esc(s)}">${esc(s)}</button>`).join("")}</div>
+        <textarea id="snote" rows="2" aria-label="Message to the team" placeholder="What should change?"></textarea>
+        <div id="pend" class="pend"></div>
+        <div class="comp-bar"><label class="att2"><svg viewBox="0 0 24 24"><path d="M20 11l-8 8a5 5 0 01-7-7l8-8a3.5 3.5 0 015 5l-8 8a2 2 0 01-3-3l7-7"/></svg>Attach file or design system<input type="file" id="sfile" multiple hidden></label><button class="send" id="ssend" disabled>Send</button></div></div></section>`;
   }
   function steer(j, text, files) {
     if (live && j.live && text) post("/api/jobs/" + j.id + "/steer", { text }).then(pull);
@@ -228,16 +232,16 @@
     say(j.f, fl(j.f).name, "Change request received: " + ((text || files[0] || "").slice(0, 48)));
     setTimeout(() => { r.typing = 0; let i = 0; const iv = setInterval(() => { i += 3; r.text = reply.slice(0, i); drawThread(j); if (i >= reply.length) { clearInterval(iv); const dv = $("#dlv"); if (dv) dv.innerHTML = docsFor(j.id); } }, 22); }, 900);
   }
-  function drawThread(j) { const el = $("#thread"); if (!el) return; el.innerHTML = thr(j).map(m => msgHtml(m, j)).join(""); el.scrollTop = el.scrollHeight; }
+  function drawThread(j) { const el = $("#thread"); if (!el) return; const t = thr(j); el.innerHTML = t.length ? t.map(m => msgHtml(m, j)).join("") : EMPTY; el.scrollTop = el.scrollHeight; }
   function wireWork() {
     const j = jobs.find(x => x.id === S.work); if (!j) return;
     const n = $("#snote"), s = $("#ssend"), f = $("#sfile"), p = $("#pend");
     const upd = () => { s.disabled = !(n.value.trim() || S.pend.length); p.innerHTML = S.pend.map((x, i) => `<span class="fchip">${esc(x)} <button data-unpend="${i}" aria-label="Remove">×</button></span>`).join(""); };
-    n.oninput = () => { n.style.height = "auto"; n.style.height = Math.min(120, n.scrollHeight) + "px"; upd(); };
+    n.oninput = () => { n.style.height = "auto"; n.style.height = Math.max(64, Math.min(140, n.scrollHeight)) + "px"; upd(); };
     n.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!s.disabled) s.click(); } };
     f.onchange = () => { S.pend.push(...[...f.files].map(x => x.name)); upd(); };
-    s.onclick = () => { steer(j, n.value.trim(), S.pend.splice(0)); n.value = ""; n.style.height = "auto"; upd(); };
-    document.querySelectorAll("[data-sug]").forEach(b => b.onclick = () => { n.value = b.dataset.sug; n.focus(); upd(); });
+    s.onclick = () => { steer(j, n.value.trim(), S.pend.splice(0)); n.value = ""; n.style.height = ""; upd(); };
+    document.querySelectorAll("[data-sug]").forEach(b => b.onclick = () => { n.value = b.dataset.sug; n.oninput(); n.focus(); });
     p.onclick = e => { const u = e.target.closest("[data-unpend]"); if (u) { S.pend.splice(+u.dataset.unpend, 1); upd(); } };
     upd(); drawThread(j);
   }

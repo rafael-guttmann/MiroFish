@@ -26,6 +26,7 @@
   };
   TH.shared = { fl: ["carpet", "#d6d8de", "#caccd4"], wall: "#2a2f3a", trim: "#c9a24a", desk: ["#e4e6ea", "#b4b8c2"], chair: "#2a2f3a", acc: "mug", deco: ["board", "clock", "window", "board"], lounge: [["sofa", 8, 200, "#475569"], ["plant", 150, 196]], rug: ["#2a2f3a", "#c9a24a"] };
   const MIN_AGENTS = 10;
+  const PARTNERS = new Set("ogc-eizirik ogc-laster ogc-demarest ogc-lipton ah-bamford ah-schwarzman ah-lemann bp-rumelt bp-sahlman dgib-rohatyn dgib-quattrone dgib-wasserstein cio-marks cio-swensen cio-ellis spc-thiel spc-wilson managing-partner cto-larson dani mh-ogilvy mh-olivetto mh-vignelli".split(" "));
   const DECO_X = [6, 38, 142, 174];
   const BOARD_TH = { fl: ["checker", "#2a2d36", "#252831"], wall: "#16181D", trim: "#c9a24a", desk: ["#3b2a1d", "#2a1d13"], chair: "#111", deco: [], rug: ["#7a1f2b", "#c9a24a"] };
   let raf = 0, room = "plenary", g = null;
@@ -152,7 +153,7 @@
     host.innerHTML = `<div class="fl-bar" id="flbar"></div>
       <div class="fl-hud" id="flhud"></div>
       <div class="fl-wrap" id="flwrap"><div class="fl-stage" id="flstage"><canvas id="flcv" width="${W}" height="${H}" aria-label="Pixel office floor"></canvas><i class="fl-crt"></i></div><div class="fl-tip" id="fltip" hidden></div></div>
-      <p class="fl-legend"><b>!</b> asking you &nbsp;·&nbsp; <b>…</b> working &nbsp;·&nbsp; <b>desk</b> working alone &nbsp;·&nbsp; <b>MEETING ROOM</b> 5+ working together &nbsp;·&nbsp; <b>PARTNERS</b> approvals &nbsp;·&nbsp; <b>bench</b> idle &nbsp;·&nbsp; tap any character</p>`;
+      <p class="fl-legend"><b>!</b> asking you &nbsp;·&nbsp; <b>…</b> working &nbsp;·&nbsp; <b>desk</b> working alone &nbsp;·&nbsp; <b>MEETING ROOM</b> 5+ working together &nbsp;·&nbsp; <b>PARTNERS</b> seated at their own desks &nbsp;·&nbsp; <b>bench</b> idle &nbsp;·&nbsp; tap any character</p>`;
     const cv = host.querySelector("#flcv"), wrap = host.querySelector("#flwrap"), stage = host.querySelector("#flstage"), tip = host.querySelector("#fltip"), bar = host.querySelector("#flbar"), hud = host.querySelector("#flhud");
     const main = cv.getContext("2d"); main.imageSmoothingEnabled = false;
     let scale = 2, sel = null, cur = null, last = performance.now(), lastSync = -1e9, t0 = performance.now();
@@ -175,15 +176,13 @@
       }
       [[242, 98, 1], [258, 98, 1], [274, 98, 1], [290, 98, 1]].forEach(([x, y]) => meet.push({ x, y, sit: 1, dir: "d", chair: 1, out: [{ x, y }, { x, y: 64 }, { x: 192, y: 64 }, { x: 192, y: CY }] }));
       [242, 258, 274, 290].forEach(x => meet.push({ x, y: 140, sit: 1, dir: "u", chair: 1, out: [{ x, y: 140 }, { x: 226, y: 140 }, { x: 226, y: 64 }, { x: 192, y: 64 }, { x: 192, y: CY }] }));
-      [[252, 158], [270, 158], [288, 158]].forEach(([x, y]) => part.push({ x, y, sit: 1, dir: "d", chair: 1, out: [{ x, y }, { x: 226, y }, { x: 226, y: CY }, { x: 192, y: CY }] }));
-      part.push({ x: 232, y: 176, sit: 1, dir: "r", chair: 1, out: [{ x: 232, y: 176 }, { x: 226, y: 176 }, { x: 226, y: CY }, { x: 192, y: CY }] });
-      part.push({ x: 308, y: 176, sit: 1, dir: "l", chair: 1, out: [{ x: 308, y: 176 }, { x: 308, y: CY }, { x: 192, y: CY }] });
+      [[238, 164], [266, 164], [294, 164], [238, 194], [266, 194], [294, 194]].forEach(([x, y]) => part.push({ x, y, sit: 1, dir: "d", chair: 1, big: 1, out: [{ x, y }, { x: 226, y }, { x: 226, y: CY }, { x: 192, y: CY }] }));
       for (let i = 0; i < 5; i++) idle.push({ x: 68 + i * 20, y: 208, dir: "d", out: [{ x: 68 + i * 20, y: 208 }, { x: 68 + i * 20, y: CY }] });
       for (let i = 0; i < 4; i++) idle.push({ x: 78 + i * 20, y: 219, dir: "d", out: [{ x: 78 + i * 20, y: 219 }, { x: 78 + i * 20, y: CY }] });
       th.lounge.forEach(([k, x, y, c]) => objs.push({ k: y + 18, d: () => P[k]({ x, y, c }) }));
       objs.push({ k: 140, d: () => { R(234, 96, 64, 26, mix(f.accent, "#000000", .2)); R(234, 96, 64, 2, mix(f.accent, "#ffffff", .25)); R(234, 122, 64, 4, mix(f.accent, "#000000", .5)); } });
       objs.push({ k: 71, d: () => P.plant({ x: 300, y: 54 }) });
-      objs.push({ k: 186, d: () => { R(240, 160, 62, 20, "#3b2a1d"); R(240, 160, 62, 2, "#c9a24a"); R(240, 180, 62, 4, "#1c140d"); R(262, 166, 18, 8, mix(f.accent, "#000000", .1)); } });
+      part.forEach(p => objs.push({ k: p.y + 14, d: () => { const x = p.x - 12, y = p.y + 2; R(x, y, 24, 11, "#4a2f1c"); R(x, y, 24, 2, "#c9a24a"); R(x, y + 11, 24, 3, "#1c140d"); R(x + 9, y + 3, 6, 3, mix(f.accent, "#000000", .1)); R(x + 2, y - 4, 7, 5, "#15171c"); R(x + 3, y - 3, 5, 3, "#1e3550"); R(x + 17, y - 2, 5, 2, "#e8d9a0"); } }));
       objs.push({ k: 222, d: () => P.plant({ x: 302, y: 204 }) });
       return { id: f.id, firm: f, th, desks, meet, part, idle, objs, agents: new Map(), phase: 0, counts: {} };
     }
@@ -237,17 +236,18 @@
       const all = f.agents.map(a => ({ a, st: api.state(a.fid, a.id) }));
       const act = all.filter(o => o.st !== "idle");
       const away = act.find(o => api.convened().includes(o.a.fid)) || null;
-      const work = act.filter(o => o !== away), bench = all.filter(o => o.st === "idle");
+      const isP = o => PARTNERS.has(o.a.id), partners = all.filter(o => o !== away && isP(o)).slice(0, 6);
+      const work = act.filter(o => o !== away && !isP(o)), bench = all.filter(o => o.st === "idle" && !isP(o));
       const team = work.filter(o => o.st !== "asking").length > 4;
       const want = new Map(); let m = 0, p = 0, desk = 0;
       r.desks.forEach(d => d.on = 0);
       work.slice(0, 12).forEach((o, i) => {
         let spot = r.desks[i].spot; r.desks[i].on = 1;
-        if (o.st === "asking" && /approv|partner|review/i.test(api.task(o.a.fid, o.a.id) || "") && p < 5) spot = r.part[p++];
-        else if (team && o.st !== "asking" && m < 8) spot = r.meet[m++];
+        if (team && o.st !== "asking" && m < 8) spot = r.meet[m++];
         if (spot === r.desks[i].spot) desk++;
         want.set(o.a.fid + "/" + o.a.id, { o, spot });
       });
+      partners.forEach((o, i) => { want.set(o.a.fid + "/" + o.a.id, { o, spot: r.part[i] }); p++; });
       r.mode = team ? "Team meeting" : work.length ? "Solo work" : "Quiet";
       r.phase = 0;
       bench.slice(0, 9).forEach((o, i) => want.set(o.a.fid + "/" + o.a.id, { o, spot: r.idle[i] }));

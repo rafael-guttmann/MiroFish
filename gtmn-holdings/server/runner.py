@@ -93,7 +93,7 @@ class AgentSDKRunner(Runner):
     positions and asks Rafael one decision card, then writes the memo with his answer and
     any steering notes. The memo is saved in data/vault/<job>/.
     """
-    REAL = {"gtmn-cto"}
+    REAL = {"gtmn-cto", "plenary"}
     SEAT_NAMES = {"cto-majors": "Charity Majors", "cto-willison": "Simon Willison", "cto-larson": "Will Larson"}
 
     def __init__(self, store, charters, root):
@@ -112,7 +112,12 @@ class AgentSDKRunner(Runner):
 
     def start(self, job_id):
         if self._real(job_id):
-            threading.Thread(target=self._run, args=(job_id,), daemon=True).start()
+            j = self.s.one("SELECT firm FROM jobs WHERE id=?", (job_id,))
+            if j["firm"] == "plenary":
+                import plenary
+                threading.Thread(target=plenary.run, args=(self, job_id), daemon=True).start()
+            else:
+                threading.Thread(target=self._run, args=(job_id,), daemon=True).start()
         else:
             self.sim.start(job_id)
 
@@ -129,6 +134,24 @@ class AgentSDKRunner(Runner):
             ev.set()
         else:
             self.sim.card_answered(card_id)
+
+    def _persona_at(self, fid, seat):
+        txt = (self.root / "firms" / fid / "agents" / f"{seat}.md").read_text()
+        if txt.startswith("---"):
+            txt = txt.split("---", 2)[2]
+        return txt.strip()[:30000] + "\n\nYou work for GTMN Holdings. Answer in plain prose. You see only what is given below."
+
+    def _verify(self, job_id, firm, memo, sources):
+        self._stage(job_id, firm, 4, 5, "Verifier is checking every claim in the memo")
+        ver = self._say("You are the independent verifier. You did not write this memo. Check its factual claims (names, dates, numbers, quotes, product capabilities, legal citations) using web_search and web_fetch. Output only the markdown, with no narration before it: a table | Claim | Verdict (VERIFIED / UNVERIFIED / CONTRADICTED) | Evidence and URL |, then a one-line overall verdict. Do not soften a CONTRADICTED claim.",
+                        f"Memo to verify:\n\n{memo}\n\nSources the authors already consulted:\n" + "\n".join(f"- {v} {k}" for k, v in sources.items()),
+                        3000, True, sources, job_id, "Verifier")
+        rows = [l for l in ver.splitlines() if l.startswith("|")]
+        bad = sum("CONTRADICTED" in l.upper() for l in rows)
+        flags = sum("UNVERIFIED" in l.upper() for l in rows)
+        verdict = "FAIL" if bad else ("PASS WITH FLAGS" if flags else "PASS")
+        self.s.event("verify", f"Verification result: {verdict}", job_id, firm)
+        return ver, verdict
 
     def _persona(self, seat):
         txt = (self.root / "firms" / "gtmn-cto" / "agents" / f"{seat}.md").read_text()

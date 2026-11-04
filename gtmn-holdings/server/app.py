@@ -63,7 +63,7 @@ def route_firm(text, requested):
     if requested and (requested in charters or requested == "plenary"):
         return requested
     t = text.lower()
-    rules = [(r"contract|clause|indemn|legal|law", "ogc-dg"), (r"joint venture|\bjv\b|alliance|partnership", "alliance-house"),
+    rules = [(r"plenar|joint assessment|take this to plenary|across .{2,30} and ", "plenary"), (r"contract|clause|indemn|legal|law", "ogc-dg"), (r"joint venture|\bjv\b|alliance|partnership", "alliance-house"),
              (r"valuation|raise|m&a|acquir", "dg-ib"), (r"allocation|family office|portfolio", "cio-ic-memo"),
              (r"startup|venture|seed|series", "spc-deal-team"), (r"brand|marketing|campaign|logo", "marketing-house"),
              (r"business plan|go/no-go|unit economics", "plan-house"), (r"mca|noteholder|credit", "zencredit-firm"),

@@ -261,12 +261,14 @@
     const l = docs.filter(d => d.job === jid);
     return l.length ? l.map(docRow).join("") : `<p class="sub">Nothing produced yet. Files appear here and in the Library as they are made.</p>`;
   }
+  let bk = null, bkAsked = 0;
+  const bkLoad = () => live && getj("/api/backup").then(x => { bk = x; if (S.tab === "lib") render(); }).catch(() => {});
   function library() {
     if (S.lib === "design") return designRepo();
     const by = S.lib, groups = new Map();
     docs.forEach(d => { const j = jobs.find(x => x.id === d.job), k = by === "demand" ? j.id : j.f; (groups.get(k) || groups.set(k, []).get(k)).push(d); });
     return `<div class="libwrap"><h1>Library</h1><p class="sub">Everything the firms produce, saved in one place, backed up, and sorted by the demand it came from.</p>
-      <div class="bkbar"><b>✓ All ${docs.length} files backed up</b><span>Saved to the vault and copied every night to a second location. Last backup 14:02.</span><button class="chip" data-dlall="1">↓ Download everything</button></div>
+      <div class="bkbar"><b>${bk ? (bk.last ? "✓ Backed up" : "No backup yet") : "✓ All " + docs.length + " files backed up"}</b><span>${bk ? (bk.last ? "Last backup " + new Date(bk.last.at * 1000).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + ". " : "") + "Saved in the vault and backed up every night at 02:00" + (bk.second ? ", in " + bk.locations.length + " places." : ". Set a second location to keep a copy off this machine.") : "Saved to the vault and copied every night to a second location. Last backup 14:02."}</span>${bk ? '<button class="chip" data-bknow="1">Back up now</button>' : ""}<button class="chip" data-dlall="1">↓ Download everything</button></div>
       <div class="wtoggle"><button class="chip" data-libby="demand" aria-pressed="${by === "demand"}">By demand</button><button class="chip" data-libby="firm" aria-pressed="${by === "firm"}">By firm</button><button class="chip" data-libby="design" aria-pressed="${by === "design"}">Design systems</button></div>
       ${[...groups].map(([k, l]) => { const j = by === "demand" ? jobs.find(x => x.id === k) : null, f = fl(by === "demand" ? j.f : k), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
         return `<section class="lgrp" style="--a:${ac}"><div class="lh"><h2>${esc(by === "demand" ? j.t : f.name)}</h2><small>${by === "demand" ? esc(f.name) + " · " + STL[j.col] : l.length + " files"}</small></div>${l.map(docRow).join("")}</section>`; }).join("")}
@@ -372,6 +374,7 @@
 
   function render() {
     const m = $("#main");
+    if (S.tab === "lib" && live && !bkAsked) { bkAsked = 1; bkLoad(); }
     m.innerHTML = { office, floor, board: work, lib: library, charters, needs, new: newDemand }[S.tab]();
     document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === S.tab));
     const b = $("#badge"); b.textContent = cards.length || ""; b.dataset.n = cards.length;
@@ -453,6 +456,7 @@
     else if (t.dataset.pvdl) { const [id, k] = t.dataset.pvdl.split(":"), d = docs.find(x => x.id === id); if (d.fmts.includes(k) || (live && /^d\d+$/.test(d.id))) dl(d, k); else { d.fmts.push(k); toast(`Asked the desk to also make it in ${k}.`); } pvOpen(id, k); }
     else if (t.dataset.pvsteer) { const jid = +t.dataset.pvsteer; pvClose(); S.tab = "board"; S.work = jid; S.open = new Set([jid + ":" + detail(jobs.find(j => j.id === jid)).cur]); render(); $("#main").scrollTop = 0; }
     else if (t.dataset.dl) { const [id, k] = t.dataset.dl.split(":"); dl(docs.find(x => x.id === id), k); }
+    else if (t.dataset.bknow) { toast("Backing up…"); post("/api/backup", {}).then(r => { toast(r && r.name ? "Backup saved: " + r.files + " files" : "Backup failed"); bkLoad(); }); }
     else if (t.dataset.dlall) { toast("Preparing one zip with every file (sample in this prototype)."); }
     else if (t.dataset.wback) { S.work = null; render(); }
     else if (t.dataset.wby) { S.workBy = t.dataset.wby; render(); }

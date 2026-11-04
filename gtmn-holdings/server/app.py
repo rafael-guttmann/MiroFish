@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from runner import AgentSDKRunner, SimulatedRunner
+import backup
 import render
 from store import Store
 from urllib.parse import parse_qs
@@ -38,6 +39,19 @@ for f in (ROOT / "charters").glob("*.json"):
 
 store = Store(HERE / "data" / "holdings.db")
 runner = AgentSDKRunner(store, charters, ROOT) if os.environ.get("HOLDINGS_RUNNER") == "sdk" else SimulatedRunner(store, charters)
+
+
+DATA = HERE / "data"
+BACKUP_DIRS = [os.environ.get("HOLDINGS_BACKUP_DIR") or str(DATA / "backups")] + ([os.environ["HOLDINGS_BACKUP_DIR2"]] if os.environ.get("HOLDINGS_BACKUP_DIR2") else [])
+last_backup = {}
+
+
+def do_backup(reason="manual"):
+    r = backup.run_backup(DATA, DATA / "holdings.db", BACKUP_DIRS)
+    last_backup.clear()
+    last_backup.update(r)
+    store.event("backup", f"Backup saved ({reason}): {r['files']} files, {len(r['locations'])} location(s)")
+    return r
 
 
 def approved(firm):
@@ -114,6 +128,12 @@ class H(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/docs/(\d+)/file", p)
         if m:
             return self.docfile(int(m[1]), parse_qs(urlparse(self.path).query))
+        if p == "/api/backup":
+            if not last_backup:
+                found = sorted(Path(BACKUP_DIRS[0]).glob("holdings-*.zip"))
+                if found:
+                    last_backup.update({"name": found[-1].name, "at": found[-1].stat().st_mtime, "locations": BACKUP_DIRS})
+            return self.send(200, {"last": last_backup or None, "locations": BACKUP_DIRS, "second": len(BACKUP_DIRS) > 1})
         if p == "/api/stream":
             return self.stream()
         self.send(404, {"error": "not found"})
@@ -139,6 +159,11 @@ class H(BaseHTTPRequestHandler):
             store.event("routed", f"Front desk routed the demand to {firm}", jid, firm)
             runner.start(jid)
             return self.send(201, {"id": jid, "firm": firm})
+        if p == "/api/backup":
+            try:
+                return self.send(200, do_backup())
+            except Exception as e:
+                return self.send(500, {"error": f"backup failed: {type(e).__name__}"})
         m = re.fullmatch(r"/api/jobs/(\d+)/steer", p)
         if m:
             text = str(b.get("text", "")).strip()[:2000]
@@ -248,4 +273,5 @@ class H(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     host, port = os.environ.get("HOLDINGS_HOST", "127.0.0.1"), int(os.environ.get("HOLDINGS_PORT", "8841"))
     print(f"Holdings server on http://{host}:{port}  runner={type(runner).__name__}  firms={len(charters)}")
+    backup.schedule(lambda: do_backup("nightly"), int(os.environ.get("HOLDINGS_BACKUP_HOUR", "2")))
     ThreadingHTTPServer((host, port), H).serve_forever()

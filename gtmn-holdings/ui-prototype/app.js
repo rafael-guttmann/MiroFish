@@ -249,7 +249,7 @@
     const j = jobs.find(x => x.id === d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
     return `<div class="doc" style="--a:${ac}"><div class="dico">${esc(d.type.slice(0, 1))}</div><div class="dmain"><b>${esc(d.name)} <em>v${d.ver}${d.st === "draft" ? " · draft" : ""}</em></b>
       <small>${esc(d.type)} · from ${esc(f.name)}, ${esc(d.by)} · ${d.at}</small><p>${esc(d.why)}</p>
-      <div class="dfm">${d.fmts.length ? d.fmts.map(k => `<button class="chip dlb" data-dl="${d.id}:${k}">↓ ${k}</button>`).join("") : `<span class="ask">Format not chosen yet</span>`}<button class="chip ghostc" data-fmtopen="${d.id}">${d.fmts.length ? "+ Another format" : "Choose formats"}</button></div>
+      <div class="dfm"><button class="chip pvb" data-pv="${d.id}">Preview</button>${d.fmts.length ? d.fmts.map(k => `<button class="chip dlb" data-dl="${d.id}:${k}">↓ ${k}</button>`).join("") : `<span class="ask">Format not chosen yet</span>`}<button class="chip ghostc" data-fmtopen="${d.id}">${d.fmts.length ? "+ Another format" : "Choose formats"}</button></div>
       ${S.fmtOpen === d.id ? fmtPicker(d) : ""}
       <small class="bk">✓ Backed up · vault + second copy · ${d.at}</small></div></div>`;
   }
@@ -443,6 +443,11 @@
     else if (t.dataset.fmtopen) { S.fmtOpen = S.fmtOpen === t.dataset.fmtopen ? null : t.dataset.fmtopen; S.fmtSel.clear(); keep(); }
     else if (t.dataset.fmt) { const k = t.dataset.fmt; S.fmtSel.has(k) ? S.fmtSel.delete(k) : S.fmtSel.add(k); keep(); }
     else if (t.dataset.fmtok) { const d = docs.find(x => x.id === t.dataset.fmtok); S.fmtSel.forEach(k => { if (!d.fmts.includes(k)) d.fmts.push(k); }); toast("Will be made as " + [...S.fmtSel].join(", ")); S.fmtSel.clear(); S.fmtOpen = null; keep(); }
+    else if (t.dataset.pv) pvOpen(t.dataset.pv);
+    else if (t.dataset.pvk) pvOpen(S.pv.id, t.dataset.pvk);
+    else if (t.dataset.pvx) pvClose();
+    else if (t.dataset.pvdl) { const [id, k] = t.dataset.pvdl.split(":"), d = docs.find(x => x.id === id); if (d.fmts.includes(k)) dl(d, k); else { d.fmts.push(k); toast(`Asked the desk to also make it in ${k}.`); } pvOpen(id, k); }
+    else if (t.dataset.pvsteer) { const jid = +t.dataset.pvsteer; pvClose(); S.tab = "board"; S.work = jid; S.open = new Set([jid + ":" + detail(jobs.find(j => j.id === jid)).cur]); render(); $("#main").scrollTop = 0; }
     else if (t.dataset.dl) { const [id, k] = t.dataset.dl.split(":"); dl(docs.find(x => x.id === id), k); }
     else if (t.dataset.dlall) { toast("Preparing one zip with every file (sample in this prototype)."); }
     else if (t.dataset.wback) { S.work = null; render(); }
@@ -451,6 +456,32 @@
     else if (t.dataset.openagent) { const [ff, aa] = t.dataset.openagent.split("/"); S.tab = "office"; S.firm = ff; S.agent = aa; render(); }
     else if (t.dataset.job) { const j = jobs.find(x => x.id == t.dataset.job); if (j.col === "need") { S.tab = "needs"; const i = cards.findIndex(c => c.job === j.id); if (i > 0) cards.unshift(...cards.splice(i, 1)); render(); } }
   });
+
+
+  /* PREVIEW */
+  const PVF = ["PDF", "Word", "PowerPoint", "Excel", "JPEG"];
+  const pvSec = d => [["Summary", d.why], ["Key findings", "Three points that matter most for the decision, each with its source and a confidence level."], ["Recommendation", "The desk's recommended path, the main risks, and what would change the answer."], ["Next steps", "Who does what next, with owners and dates."]];
+  function pvBody(d, k) {
+    const j = jobs.find(x => x.id === d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent, S4 = pvSec(d);
+    if (k === "PowerPoint") return `<div class="pv-slides">${[["", d.name, f.name + " · " + d.at], ...S4.map(s => [s[0], s[1], ""])].map((s, i) => `<div class="pv-slide" style="--a:${ac}"><small>${i + 1}</small>${s[0] ? `<h4>${esc(s[0])}</h4>` : ""}<b>${esc(s[1])}</b>${s[2] ? `<p>${esc(s[2])}</p>` : ""}</div>`).join("")}</div>`;
+    if (k === "Excel") return `<div class="pv-sheet"><table><thead><tr><th></th><th>Item</th><th>Base</th><th>Low</th><th>High</th></tr></thead><tbody>${["Revenue", "Costs", "Margin", "Capital needed", "Payback (months)"].map((r, i) => `<tr><td>${i + 1}</td><td>${r}</td><td>${(100 + i * 37) % 180}</td><td>${(60 + i * 29) % 120}</td><td>${(140 + i * 41) % 220}</td></tr>`).join("")}</tbody></table><p class="pv-n">Sample figures only. The real file carries the assumption register.</p></div>`;
+    if (k === "JPEG") return `<div class="pv-img" style="--a:${ac}"><b>${esc(d.name)}</b><span>${esc(f.name)}</span></div>`;
+    return `<div class="pv-page"><h3>${esc(d.name)}</h3><small>${esc(f.name)} · ${esc(d.by)} · v${d.ver} · ${d.at}</small>${S4.map(s => `<h4>${esc(s[0])}</h4><p>${esc(s[1])}</p>`).join("")}</div>`;
+  }
+  function pvOpen(id, k) {
+    const d = docs.find(x => x.id === id); if (!d) return;
+    k = k || d.fmts[0] || "PDF"; S.pv = { id, k };
+    let el = $("#pv"); if (!el) { el = document.createElement("div"); el.id = "pv"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "File preview"); document.body.appendChild(el); }
+    const have = d.fmts.length ? d.fmts : [];
+    el.innerHTML = `<div class="pv-card"><div class="pv-h"><div><b>${esc(d.name)}</b><small>v${d.ver} · ${esc(d.type)}</small></div><button class="chip" data-pvx="1" aria-label="Close preview">Close</button></div>
+      <div class="pv-tabs">${PVF.map(f => `<button class="chip" data-pvk="${f}" aria-pressed="${f === k}" style="${have.includes(f) ? "" : "opacity:.55;border-style:dashed"}">${f}</button>`).join("")}</div>
+      <p class="pv-note">${have.includes(k) ? "" : `Not made yet in ${k}. This shows how it would look. `}Sample preview: the real file is shown here once the firm has produced it.</p>
+      <div class="pv-body">${pvBody(d, k)}</div>
+      <div class="pv-f"><button class="submit" data-pvdl="${d.id}:${k}">${have.includes(k) ? "Download " + k : "Make it in " + k}</button><button class="chip" data-pvsteer="${d.job}">Steer this</button></div></div>`;
+    el.classList.add("on"); const c = el.querySelector("[data-pvx]"); if (c) c.focus();
+  }
+  const pvClose = () => { const el = $("#pv"); if (el) el.classList.remove("on"); S.pv = null; };
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && S.pv) pvClose(); });
 
   /* LIVE ENGINE: used when the page is served by server/app.py */
   const COL = { waiting: "wait", working: "work", asking: "need", done: "done" };

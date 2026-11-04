@@ -24,6 +24,8 @@
     "marketing-house": { fl: ["carpet", "#f6e7d4", "#ecd7bd"], wall: "#fff3e6", trim: "#EA580C", desk: ["#fffaf2", "#d9c3a5"], chair: "#EA580C", acc: "roll", deco: ["board", "frame", "neon", "board"], lounge: [["bean", 10, 204, "#EA580C"], ["bean", 34, 210, "#0EA5E9"], ["plant", 150, 196]], rug: ["#EA580C", "#fde68a"] },
     dani: { fl: ["wood", "#c49a6c", "#b58b5c"], wall: "#4a2c4a", trim: "#C026D3", desk: ["#e8c9a0", "#c3a27a"], chair: "#C026D3", acc: "mug", deco: ["shelf", "frame", "window", "shelf"], lounge: [["sofa", 8, 200, "#C026D3"], ["plant", 150, 196]], rug: ["#C026D3", "#f5d0fe"] }
   };
+  TH.shared = { fl: ["carpet", "#d6d8de", "#caccd4"], wall: "#2a2f3a", trim: "#c9a24a", desk: ["#e4e6ea", "#b4b8c2"], chair: "#2a2f3a", acc: "mug", deco: ["board", "clock", "window", "board"], lounge: [["sofa", 8, 200, "#475569"], ["plant", 150, 196]], rug: ["#2a2f3a", "#c9a24a"] };
+  const MIN_AGENTS = 10;
   const DECO_X = [6, 38, 142, 174];
   const BOARD_TH = { fl: ["checker", "#2a2d36", "#252831"], wall: "#16181D", trim: "#c9a24a", desk: ["#3b2a1d", "#2a1d13"], chair: "#111", deco: [], rug: ["#7a1f2b", "#c9a24a"] };
   let raf = 0, room = "plenary", g = null;
@@ -157,11 +159,15 @@
     const bgCache = {};
 
     const firmById = id => api.byId[id];
+    const tag = f => f.agents.map(a => ({ ...a, fid: f.id, accent: f.accent }));
+    const small = api.firms.filter(f => f.agents.length < MIN_AGENTS).sort((a, b) => a.agents.length - b.agents.length);
+    const offices = api.firms.filter(f => f.agents.length >= MIN_AGENTS).map(f => ({ ...f, agents: tag(f), fids: [f.id] }));
+    if (small.length) offices.push({ id: "shared", name: "Shared office", accent: "#475569", agents: small.flatMap(tag), fids: small.map(f => f.id), shared: 1 });
     const rooms = {};
 
     /* ----- room construction ----- */
     function makeFirmRoom(f) {
-      const th = TH[f.id] || TH.dani, desks = [], objs = [], meet = [], part = [], idle = [];
+      const th = TH[f.shared ? "shared" : f.id] || TH.dani, desks = [], objs = [], meet = [], part = [], idle = [];
       for (let i = 0; i < 12; i++) {
         const c = i % 4, r = (i / 4) | 0, dx = 10 + 48 * c, dy = 64 + 48 * r, ax = 48 + 48 * c, sy = dy + 4;
         const spot = { x: dx + 20, y: sy, sit: 1, dir: "d", out: [{ x: dx + 20, y: sy }, { x: ax, y: sy }, { x: ax, y: CY }] };
@@ -191,7 +197,7 @@
     /* ----- agents ----- */
     function newAgent(f, ag, spot, spawn) {
       const h = hash(ag.name + f.id);
-      const a = { id: ag.id, fid: f.id, name: ag.name, col: f.accent, skin: SKIN[h % 5], hair: HAIR[(h >> 3) % 6], x: (spawn || spot).x, y: (spawn || spot).y, dir: spot.dir || "d", sit: !spawn && !!spot.sit, moving: false, path: [], spot, want: spot, st: "working", seed: h };
+      const a = { id: ag.id, fid: ag.fid || f.id, name: ag.name, col: ag.accent || f.accent, skin: SKIN[h % 5], hair: HAIR[(h >> 3) % 6], x: (spawn || spot).x, y: (spawn || spot).y, dir: spot.dir || "d", sit: !spawn && !!spot.sit, moving: false, path: [], spot, want: spot, st: "working", seed: h };
       if (spawn) { a.spot = { x: spawn.x, y: spawn.y, out: [] }; a.sit = false; go(a, spot); }
       return a;
     }
@@ -228,28 +234,28 @@
         r.counts = { board: ids.length };
         return;
       }
-      const all = f.agents.map(a => ({ a, st: api.state(f.id, a.id) }));
+      const all = f.agents.map(a => ({ a, st: api.state(a.fid, a.id) }));
       const act = all.filter(o => o.st !== "idle");
-      const away = api.convened().includes(f.id) && act.length ? act[0] : null;
+      const away = act.find(o => api.convened().includes(o.a.fid)) || null;
       const work = act.filter(o => o !== away), bench = all.filter(o => o.st === "idle");
       const team = work.filter(o => o.st !== "asking").length > 4;
       const want = new Map(); let m = 0, p = 0, desk = 0;
       r.desks.forEach(d => d.on = 0);
       work.slice(0, 12).forEach((o, i) => {
         let spot = r.desks[i].spot; r.desks[i].on = 1;
-        if (o.st === "asking" && /approv|partner|review/i.test(api.task(f.id, o.a.id) || "") && p < 5) spot = r.part[p++];
+        if (o.st === "asking" && /approv|partner|review/i.test(api.task(o.a.fid, o.a.id) || "") && p < 5) spot = r.part[p++];
         else if (team && o.st !== "asking" && m < 8) spot = r.meet[m++];
         if (spot === r.desks[i].spot) desk++;
-        want.set(o.a.id, { o, spot });
+        want.set(o.a.fid + "/" + o.a.id, { o, spot });
       });
       r.mode = team ? "Team meeting" : work.length ? "Solo work" : "Quiet";
       r.phase = 0;
-      bench.slice(0, 9).forEach((o, i) => want.set(o.a.id, { o, spot: r.idle[i] }));
+      bench.slice(0, 9).forEach((o, i) => want.set(o.a.fid + "/" + o.a.id, { o, spot: r.idle[i] }));
       [...r.agents.keys()].forEach(id => { if (!want.has(id)) r.agents.delete(id); });
       want.forEach(({ o, spot }, id) => {
         let a = r.agents.get(id);
         if (!a) { a = newAgent(f, o.a, spot); r.agents.set(id, a); }
-        a.st = o.st; a.task = api.task(f.id, id);
+        a.st = o.st; a.task = api.task(o.a.fid, o.a.id);
         if (spot !== a.spot && spot !== a.pending) { if (a.moving) a.pending = spot; else go(a, spot); }
       });
       r.counts = { away: away ? 1 : 0, war: m, par: p, desk, bench: bench.length, work: work.length, more: Math.max(0, work.length - 12), benchMore: Math.max(0, bench.length - 9) };
@@ -315,12 +321,12 @@
     function updateHud(r) {
       const f = r.firm, c = r.counts, names = ["Kickoff", "Drafting", "Review"];
       if (r.isBoard) { hud.innerHTML = `<span class="fl-tag" style="--a:#16181D">PLENARY</span><span>${c.board} firms at the table</span><span>one fact ledger · blind positions</span>`; }
-      else hud.innerHTML = `<span class="fl-tag" style="--a:${f.accent}">${f.name.toUpperCase()}</span><span class="fl-ph">${r.mode}</span><span>MEETING <b>${c.war || 0}</b></span><span>PARTNERS <b>${c.par || 0}</b></span><span>AT PLENARY <b>${c.away || 0}</b></span><span>DESKS <b>${c.desk || 0}</b></span><span>BENCH <b>${c.bench || 0}</b></span>${c.more || c.benchMore ? `<span class="fl-more">+${(c.more || 0) + (c.benchMore || 0)} more off-screen</span>` : ""}`;
+      else hud.innerHTML = `<span class="fl-tag" style="--a:${f.accent}">${f.name.toUpperCase()}</span>${f.shared ? `<span>${f.fids.map(i => SHORT[i] || i).join(" + ")}</span>` : ""}<span class="fl-ph">${r.mode}</span><span>MEETING <b>${c.war || 0}</b></span><span>PARTNERS <b>${c.par || 0}</b></span><span>AT PLENARY <b>${c.away || 0}</b></span><span>DESKS <b>${c.desk || 0}</b></span><span>BENCH <b>${c.bench || 0}</b></span>${c.more || c.benchMore ? `<span class="fl-more">+${(c.more || 0) + (c.benchMore || 0)} more off-screen</span>` : ""}`;
       drawBar();
     }
     function drawBar() {
       const chip = (id, name, n, a) => `<button class="chip" data-room="${id}" aria-pressed="${room === id}" style="--a:${a}"><i></i>${name}${n ? ` · ${n}` : ""}</button>`;
-      bar.innerHTML = chip("plenary", "Boardroom", api.convened().length, "#16181D") + api.firms.map(f => chip(f.id, f.name, f.agents.filter(a => api.state(f.id, a.id) !== "idle").length, f.accent)).join("");
+      bar.innerHTML = chip("plenary", "Boardroom", api.convened().length, "#16181D") + offices.map(f => chip(f.id, f.name, f.agents.filter(a => api.state(a.fid, a.id) !== "idle").length, f.accent)).join("");
     }
     function resize() {
       const avail = wrap.clientWidth - 8; scale = avail >= 640 ? Math.floor(avail / W) : avail / W;
@@ -336,7 +342,7 @@
     cv.addEventListener("click", ev => {
       const a = pick(ev); sel = a;
       if (!a) { tip.hidden = true; return; }
-      const r = rooms[room], fm = r.isBoard ? a.rep : r.firm, where = r.isBoard ? "at the boardroom table" : a.sit ? (a.spot.dir === "u" || r.meet.includes(a.spot) ? "in the meeting room" : r.part.includes(a.spot) ? "in the partners room" : "at their desk") : a.st === "idle" ? "on the bench" : "on the way";
+      const r = rooms[room], fm = r.isBoard ? a.rep : (firmById(a.fid) || r.firm), where = r.isBoard ? "at the boardroom table" : a.sit ? (a.spot.dir === "u" || r.meet.includes(a.spot) ? "in the meeting room" : r.part.includes(a.spot) ? "in the partners room" : "at their desk") : a.st === "idle" ? "on the bench" : "on the way";
       const s = a.st === "asking" ? "asking you" : a.st === "idle" ? "on the bench" : "working";
       tip.innerHTML = `<b>${a.name}</b><small>${fm.name} · ${s} · ${where}</small><p>${a.task && a.st !== "idle" ? a.task : "Nothing right now."}</p>${a.st === "asking" ? '<button class="send" data-go="needs">Answer</button>' : ""}${!r.isBoard ? '<button class="ghost" data-go="agent">Open in Office</button>' : ""}`;
       tip.hidden = false; tip.dataset.f = fm.id; tip.dataset.a = a.id;
@@ -348,7 +354,7 @@
     bar.addEventListener("click", e => { const b = e.target.closest("[data-room]"); if (!b) return; room = b.dataset.room; sel = null; tip.hidden = true; lastSync = -1e9; drawBar(); });
     window.addEventListener("resize", resize);
 
-    rooms.plenary = makeBoard(); api.firms.forEach(f => rooms[f.id] = makeFirmRoom(f));
+    rooms.plenary = makeBoard(); offices.forEach(f => rooms[f.id] = makeFirmRoom(f));
     if (!rooms[room]) room = "plenary";
     drawBar(); resize(); raf = requestAnimationFrame(frame);
   }

@@ -16,6 +16,12 @@ from runner import AgentSDKRunner, SimulatedRunner
 from store import Store
 
 HERE = Path(__file__).parent
+_env = HERE / ".env"
+if _env.exists():
+    for _l in _env.read_text().splitlines():
+        if "=" in _l and not _l.lstrip().startswith("#"):
+            _k, _v = _l.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip().strip("\"'"))
 ROOT = HERE.parent
 UI = ROOT / "ui-prototype"
 TOKEN = os.environ.get("HOLDINGS_TOKEN", "")
@@ -29,7 +35,7 @@ for f in (ROOT / "charters").glob("*.json"):
         charters[c["id"]] = c
 
 store = Store(HERE / "data" / "holdings.db")
-runner = AgentSDKRunner() if os.environ.get("HOLDINGS_RUNNER") == "sdk" else SimulatedRunner(store, charters)
+runner = AgentSDKRunner(store, charters, ROOT) if os.environ.get("HOLDINGS_RUNNER") == "sdk" else SimulatedRunner(store, charters)
 
 
 def approved(firm):

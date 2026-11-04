@@ -86,15 +86,111 @@ class SimulatedRunner(Runner):
 
 
 class AgentSDKRunner(Runner):
-    """Real execution via the Claude Agent SDK. Not wired yet.
+    """Real execution through the Claude API. The CTO firm runs for real; other firms
+    fall back to the simulated runner until their personas are wired.
 
-    Plan: one session per job; the firm's desk skill is the entrypoint; each charter
-    agent becomes an isolated subagent (blind seats never share context); tool use that
-    needs Rafael pauses the session and becomes a question card; steering notes are
-    injected as a new user turn at the next step boundary.
+    Flow: each seat gets only the mandate (blind, in parallel), the desk reads the three
+    positions and asks Rafael one decision card, then writes the memo with his answer and
+    any steering notes. The memo is saved in data/vault/<job>/.
     """
+    REAL = {"gtmn-cto"}
+    SEAT_NAMES = {"cto-majors": "Charity Majors", "cto-willison": "Simon Willison", "cto-larson": "Will Larson"}
 
-    def __init__(self, *a, **k):
+    def __init__(self, store, charters, root):
+        import anthropic
         if not os.environ.get("ANTHROPIC_API_KEY"):
-            raise RuntimeError("Set ANTHROPIC_API_KEY in the server environment to use the real runner.")
-        raise NotImplementedError("AgentSDKRunner is the next build step (CTO firm first).")
+            raise RuntimeError("ANTHROPIC_API_KEY is not set. Put it in server/.env")
+        self.client = anthropic.Anthropic(max_retries=3, timeout=240)
+        self.model = os.environ.get("HOLDINGS_MODEL", "claude-sonnet-4-5")
+        self.s, self.charters, self.root = store, charters, root
+        self.sim = SimulatedRunner(store, charters)
+        self.notes, self.waiting = {}, {}
+
+    def _real(self, job_id):
+        j = self.s.one("SELECT firm FROM jobs WHERE id=?", (job_id,))
+        return j and j["firm"] in self.REAL
+
+    def start(self, job_id):
+        if self._real(job_id):
+            threading.Thread(target=self._run, args=(job_id,), daemon=True).start()
+        else:
+            self.sim.start(job_id)
+
+    def steer(self, job_id, text, files):
+        if not self._real(job_id):
+            return self.sim.steer(job_id, text, files)
+        self.notes.setdefault(job_id, []).append(text)
+        j = self.s.one("SELECT firm FROM jobs WHERE id=?", (job_id,))
+        self.s.event("steer", f"Desk will apply your note at the next step: {text[:80]}", job_id, j["firm"])
+
+    def card_answered(self, card_id):
+        ev = self.waiting.get(card_id)
+        if ev:
+            ev.set()
+        else:
+            self.sim.card_answered(card_id)
+
+    def _persona(self, seat):
+        txt = (self.root / "firms" / "gtmn-cto" / "agents" / f"{seat}.md").read_text()
+        if txt.startswith("---"):
+            txt = txt.split("---", 2)[2]
+        return txt.strip() + "\n\nYou work for GTMN Holdings. Answer in plain prose under 450 words. You see only the mandate below."
+
+    def _say(self, system, user, max_tokens=1800):
+        r = self.client.messages.create(model=self.model, max_tokens=max_tokens, system=system,
+                                        messages=[{"role": "user", "content": user}])
+        return "".join(b.text for b in r.content if b.type == "text").strip()
+
+    def _stage(self, job_id, firm, i, n, label):
+        self.s.run("UPDATE jobs SET stage=?, progress=? WHERE id=?", (i, i / n, job_id))
+        self.s.event("stage", label, job_id, firm)
+
+    def _run(self, job_id):
+        s = self.s
+        j = s.one("SELECT * FROM jobs WHERE id=?", (job_id,))
+        firm, title = j["firm"], j["title"]
+        try:
+            s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+            s.event("start", "Office of the CTO picked up the demand", job_id, firm)
+            self._stage(job_id, firm, 0, 4, "Desk framed the mandate; seats start blind")
+            seats = list(self.SEAT_NAMES)
+            out = {}
+
+            def work(seat):
+                out[seat] = self._say(self._persona(seat), f"Mandate: {title}\n\nGive your independent position: verdict, the 3 things that matter most from your lane, and what would change your mind.")
+                s.event("step", f"{self.SEAT_NAMES[seat]} filed a blind position", job_id, firm)
+            ts = [threading.Thread(target=work, args=(x,)) for x in seats]
+            [t.start() for t in ts]
+            [t.join() for t in ts]
+            self._stage(job_id, firm, 1, 4, "All three positions filed; desk is comparing them")
+            positions = "\n\n".join(f"### {self.SEAT_NAMES[k]}\n{v}" for k, v in out.items())
+            raw = self._say("You are the orchestrating desk of the Office of the CTO. Reply with JSON only.",
+                            f"Mandate: {title}\n\nBlind positions:\n{positions}\n\nFind the single decision where the seats pull apart or that only Rafael can make. Return JSON: {{\"q\": question, \"why\": one sentence, \"opts\": [[label, one-line consequence, 1 for recommended or omit], ...2-3 options]}}", 700)
+            try:
+                card = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+                payload = {"kind": "one", "q": card["q"], "opts": card["opts"], "why": card.get("why", ""), "def": "Nothing moves until you answer."}
+            except Exception:
+                payload = {"kind": "one", "q": "Which direction should the memo recommend?", "opts": [["Follow the majority", "", 1], ["Keep the dissent visible"]], "why": "The seats differ.", "def": "Nothing moves until you answer."}
+            cid = s.run("INSERT INTO cards(job,firm,payload,created) VALUES(?,?,?,?)", (job_id, firm, json.dumps(payload), time.time()))
+            s.run("UPDATE jobs SET status='asking' WHERE id=?", (job_id,))
+            s.event("card", payload["q"], job_id, firm, {"card": cid})
+            ev = self.waiting[cid] = threading.Event()
+            ev.wait()
+            answer = (s.one("SELECT answer FROM cards WHERE id=?", (cid,)) or {}).get("answer") or ""
+            s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+            self._stage(job_id, firm, 2, 4, "Desk is writing the decision memo")
+            steer = "\n".join(self.notes.get(job_id, []))
+            memo = self._say("You are the orchestrating desk of the Office of the CTO at GTMN Holdings. Write a decision memo in a senior consulting partner's register: answer first, then reasoning, preserved dissent, risks, next steps. Markdown, under 900 words.",
+                             f"Mandate: {title}\n\nBlind positions:\n{positions}\n\nRafael's decision: {answer}\n\nRafael's steering notes (apply them): {steer or 'none'}", 2600)
+            vault = self.root / "server" / "data" / "vault" / f"job-{job_id}"
+            vault.mkdir(parents=True, exist_ok=True)
+            (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Blind positions\n\n{positions}\n")
+            fmts = j["formats"]
+            s.run("UPDATE jobs SET status='done', progress=1, stage=3 WHERE id=?", (job_id,))
+            s.run("INSERT INTO docs(job,name,kind,by,formats,created) VALUES(?,?,?,?,?,?)", (job_id, title, "Decision memo", "cto-desk", fmts, time.time()))
+            s.event("done", "Memo is in the vault and the Library.", job_id, firm)
+            if not json.loads(fmts):
+                self.sim._ask_formats(job_id, firm)
+        except Exception as e:
+            s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
+            s.event("error", f"Run stopped: {type(e).__name__}: {str(e)[:160]}", job_id, firm)

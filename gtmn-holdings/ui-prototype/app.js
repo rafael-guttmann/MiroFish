@@ -330,12 +330,45 @@
 
   function toast(t) { const e = $("#toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.h); toast.h = setTimeout(() => e.classList.remove("on"), 2600); }
 
+  /* CHARTERS */
+  const CH = window.CHARTERS || [];
+  const rev = (() => { try { return JSON.parse(localStorage.getItem("chRev") || "{}"); } catch (e) { return {}; } })();
+  S.chOpen = null;
+  const chSt = c => (rev[c.id] || {}).decision || "proposed";
+  const agName = id => { for (const f of FIRMS) { const a = f.agents.find(x => x.id === id); if (a) return a.name; } return id; };
+  fetch("/api/charters").then(r => r.ok ? r.json() : []).then(l => { l.forEach(x => rev[x.charter] = x); if (l.length) { localStorage.setItem("chRev", JSON.stringify(rev)); if (S.tab === "charters") render(); updCb(); } }).catch(() => {});
+  function updCb() { const n = CH.filter(c => chSt(c) === "proposed").length, b = document.getElementById("cbadge"); if (b) { b.textContent = n || ""; b.dataset.n = n; } }
+  function charters() {
+    const n = CH.filter(c => chSt(c) === "proposed").length;
+    return `<h1>Charters</h1><p class="lede" style="color:var(--ink2);font-size:14px;line-height:1.5;margin:6px 0 14px">A charter is a firm's rulebook: who sits on it, which gates it must pass, who can veto, and what it delivers. A firm only takes demands once you approve its charter. ${n ? `${n} of ${CH.length} waiting for you.` : "All reviewed."}</p>` + CH.map(c => {
+      const s = chSt(c), open = S.chOpen === c.id, r = rev[c.id] || {};
+      const lab = { proposed: "Waiting for you", approved: "Approved", changes: "Changes requested" }[s];
+      const body = open ? `<div class="ch-b"><h4>What it is</h4><p>${esc(c.summary)}</p>
+        <h4>Gates it must pass</h4><ul>${c.gates.map(g => `<li>${esc(g)}</li>`).join("") || "<li>None listed</li>"}</ul>
+        <h4>Senior panel (reviews and signs off)</h4><p>${c.panel.map(agName).map(esc).join(", ") || "None"}${c.signoff ? ` · final sign-off: ${esc(agName(c.signoff))}` : ""}</p>
+        <h4>Can veto</h4><ul>${c.veto.map(v => `<li>${esc(v.ground || v)}</li>`).join("") || "<li>No vetoes</li>"}</ul>
+        <h4>Delivers</h4><p>${c.outputs.map(esc).join(", ")}</p>
+        ${c.notes ? `<h4>Notes</h4><p>${esc(c.notes)}</p>` : ""}
+        ${r.note ? `<h4>Your last note</h4><p>${esc(r.note)}</p>` : ""}
+        <div class="ch-act"><textarea id="chnote" placeholder="Anything to change? (optional)" aria-label="Note on this charter"></textarea>
+        <button class="chip" data-chrev="${c.id}:changes">Request changes</button><button class="submit" data-chrev="${c.id}:approved">${s === "approved" ? "Approved ✓" : "Approve charter"}</button></div></div>` : "";
+      return `<div class="ch" style="--a:${c.accent || "#475569"}"><button class="ch-h" data-chopen="${c.id}" aria-expanded="${open}"><i class="sw"></i><div><b>${esc(c.name)}</b><small>${c.agents} agent${c.agents === 1 ? "" : "s"} · ${c.gates.length} gate${c.gates.length === 1 ? "" : "s"} · ${c.panel.length} senior</small></div><span class="st ${s === "approved" ? "ok" : s === "changes" ? "ch2" : ""}">${lab}</span></button>${body}</div>`;
+    }).join("");
+  }
+  function review(id, decision) {
+    const note = ($("#chnote") || {}).value || "";
+    rev[id] = { charter: id, decision, note, created: Date.now() / 1000 };
+    localStorage.setItem("chRev", JSON.stringify(rev));
+    fetch("/api/charters/" + id + "/review", { method: "POST", body: JSON.stringify({ decision, note }) }).catch(() => {});
+    S.chOpen = null; toast(decision === "approved" ? "Charter approved." : "Changes requested. The firm stays paused."); render();
+  }
+
   function render() {
     const m = $("#main");
-    m.innerHTML = { office, floor, board: work, lib: library, needs, new: newDemand }[S.tab]();
+    m.innerHTML = { office, floor, board: work, lib: library, charters, needs, new: newDemand }[S.tab]();
     document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === S.tab));
     const b = $("#badge"); b.textContent = cards.length || ""; b.dataset.n = cards.length;
-    renderAside();
+    renderAside(); updCb();
     if (S.tab === "floor") mountFloor();
     if (S.tab === "needs") wireNeeds();
     if (S.tab === "new") wireNew();
@@ -384,6 +417,8 @@
   const keep = () => { const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; };
   document.addEventListener("click", e => {
     const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.chopen) { S.chOpen = S.chOpen === t.dataset.chopen ? null : t.dataset.chopen; const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; return; }
+    if (t.dataset.chrev) { const [i, d] = t.dataset.chrev.split(":"); review(i, d); return; }
     if (t.dataset.tab) { S.fmtOpen = null; S.tab = t.dataset.tab; if (S.tab === "board") S.work = null; if (S.tab === "office") { S.firm = null; S.agent = null; } render(); }
     else if (t.dataset.firm && S.tab === "office") { S.firm = t.dataset.firm; S.agent = null; S.showAll = false; render(); }
     else if (t.dataset.agent) { S.agent = t.dataset.agent; render(); }

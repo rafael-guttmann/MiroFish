@@ -262,6 +262,17 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 .ghostc{border-style:dashed!important}.bk{color:#1c7a45!important}
 .fpick{background:#F5F6F9;border-radius:10px;padding:10px 12px;margin:6px 0}.fchips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.submit.sm{padding:8px 16px;font-size:14px}
 .std{align-items:center}.libwrap .drop{display:block;margin-top:10px;cursor:pointer}
+
+.ch{border:1px solid var(--line);border-radius:14px;background:#fff;margin:12px 0;overflow:hidden}
+.ch-h{display:flex;gap:12px;align-items:center;padding:14px 16px;width:100%;text-align:left}
+.ch-h .sw{width:12px;height:36px;border-radius:4px;background:var(--a);flex:none}
+.ch-h b{display:block;font-size:16px}.ch-h small{color:var(--ink3);font-size:13px}.ch-h>div{flex:1;min-width:0}
+.st{font:600 12px/1 var(--sans);padding:6px 10px;border-radius:99px;background:#F1F2F4;color:var(--ink2);white-space:nowrap}
+.st.ok{background:#EAF5EE;color:#1c5a35}.st.ch2{background:#FDF1E3;color:#b45309}
+.ch-b{padding:4px 16px 16px;border-top:1px solid var(--line)}.ch-b h4{margin:16px 0 6px;font-size:13px;color:var(--ink3);font-weight:600}
+.ch-b p{margin:0;font-size:14px;line-height:1.5}.ch-b ul{margin:0;padding-left:18px;font-size:14px;line-height:1.55}
+.ch-act{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:18px}.ch-act textarea{flex:1 1 220px;min-height:42px;border:1.5px solid var(--line2);border-radius:10px;padding:10px;font:14px var(--sans);resize:vertical}
+.ch-act .submit{width:auto;padding:11px 18px;font-size:14px}.ch-act .chip.dlb{background:#fff!important;color:var(--ink)!important;border-color:var(--line2)!important}
 </style>
 </head>
 <body>
@@ -272,6 +283,7 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
     <button class="tab" role="tab" data-tab="floor"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg>Floor</button>
     <button class="tab" role="tab" data-tab="board"><svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="5" height="16" rx="1.2"/><rect x="10" y="4" width="5" height="10" rx="1.2"/><rect x="16.5" y="4" width="4" height="13" rx="1.2"/></svg>Work</button>
     <button class="tab" role="tab" data-tab="lib"><svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 015.5 4H10l2 2.5h6.5A1.5 1.5 0 0120 8v9.5a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 014 17.5z"/></svg>Library</button>
+    <button class="tab" role="tab" data-tab="charters"><svg viewBox="0 0 24 24"><path d="M6 3.5h9l3 3V20.5H6z"/><path d="M14.5 3.5V7H18M9 12h6M9 15.5h6M9 9h2"/></svg>Charters<span class="badge" id="cbadge" data-n="0"></span></button>
     <button class="tab" role="tab" data-tab="needs"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M12 8.5v3M12 13.6h.01"/></svg>Needs you<span class="badge" id="badge" data-n="0"></span></button>
     <button class="tab" role="tab" data-tab="new"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New demand</button>
   </nav>
@@ -281,7 +293,8 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 <div class="proto">Clickable prototype · sample data</div>
 <div class="toast" id="toast" role="status"></div>
 <script src="data.js"></script>
+<script src="charters.js"></script>
 <script src="floor.js?v=13"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

@@ -78,6 +78,8 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/firms":
             return self.send(200, [{"id": c["id"], "name": c["name"], "accent": c.get("accent"), "agents": len(c["agents"]),
                                     "partners": c.get("senior_panel", []), "outputs": c.get("outputs", [])} for c in charters.values()])
+        if p == "/api/charters":
+            return self.send(200, store.rows("SELECT charter, decision, note, created FROM charter_reviews r WHERE id=(SELECT MAX(id) FROM charter_reviews WHERE charter=r.charter)"))
         if p == "/api/jobs":
             return self.send(200, store.rows("SELECT * FROM jobs ORDER BY id DESC"))
         m = re.fullmatch(r"/api/jobs/(\d+)", p)
@@ -135,6 +137,15 @@ class H(BaseHTTPRequestHandler):
             store.run("UPDATE cards SET answer=?, state='answered' WHERE id=?", (str(b.get("answer", ""))[:2000], m[1]))
             store.event("answer", "Rafael answered a card", c["job"], c["firm"])
             runner.card_answered(int(m[1]))
+            return self.send(200, {"ok": True})
+        m = re.fullmatch(r"/api/charters/([a-z0-9-]+)/review", p)
+        if m:
+            d = b.get("decision")
+            if m[1] not in charters or d not in ("approved", "changes"):
+                return self.send(400, {"error": "bad charter or decision"})
+            store.run("INSERT INTO charter_reviews(charter,decision,note,created) VALUES(?,?,?,?)",
+                      (m[1], d, str(b.get("note", ""))[:2000], time.time()))
+            store.event("charter", f"Rafael {'approved' if d == 'approved' else 'requested changes to'} the {charters[m[1]]['name']} charter", None, m[1])
             return self.send(200, {"ok": True})
         if p == "/api/design-systems":
             name = str(b.get("name", "")).strip()[:120]

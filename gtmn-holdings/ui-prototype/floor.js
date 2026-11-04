@@ -153,8 +153,8 @@
     host.innerHTML = `<div class="fl-bar" id="flbar"></div>
       <div class="fl-hud" id="flhud"></div>
       <div class="fl-wrap" id="flwrap"><div class="fl-stage" id="flstage"><canvas id="flcv" width="${W}" height="${H}" aria-label="Pixel office floor"></canvas><i class="fl-crt"></i></div><div class="fl-tip" id="fltip" hidden></div></div>
-      <p class="fl-legend"><b>!</b> asking you &nbsp;·&nbsp; <b>…</b> working &nbsp;·&nbsp; <b>desk</b> working alone &nbsp;·&nbsp; <b>MEETING ROOM</b> 5+ working together &nbsp;·&nbsp; <b>PARTNERS</b> seated at their own desks &nbsp;·&nbsp; <b>bench</b> idle &nbsp;·&nbsp; tap any character</p>`;
-    const cv = host.querySelector("#flcv"), wrap = host.querySelector("#flwrap"), stage = host.querySelector("#flstage"), tip = host.querySelector("#fltip"), bar = host.querySelector("#flbar"), hud = host.querySelector("#flhud");
+      <div class="fl-roster" id="flroster"></div><p class="fl-legend"><b>!</b> asking you &nbsp;·&nbsp; <b>…</b> working &nbsp;·&nbsp; <b>desk</b> working alone &nbsp;·&nbsp; <b>MEETING ROOM</b> 5+ working together &nbsp;·&nbsp; <b>PARTNERS</b> seated at their own desks &nbsp;·&nbsp; <b>bench</b> idle &nbsp;·&nbsp; tap any character</p>`;
+    const cv = host.querySelector("#flcv"), wrap = host.querySelector("#flwrap"), stage = host.querySelector("#flstage"), tip = host.querySelector("#fltip"), bar = host.querySelector("#flbar"), roster = host.querySelector("#flroster"), hud = host.querySelector("#flhud");
     const main = cv.getContext("2d"); main.imageSmoothingEnabled = false;
     let scale = 2, sel = null, cur = null, last = performance.now(), lastSync = -1e9, t0 = performance.now();
     const bgCache = {};
@@ -196,7 +196,7 @@
     /* ----- agents ----- */
     function newAgent(f, ag, spot, spawn) {
       const h = hash(ag.name + f.id);
-      const a = { id: ag.id, fid: ag.fid || f.id, name: ag.name, col: ag.accent || f.accent, skin: SKIN[h % 5], hair: HAIR[(h >> 3) % 6], x: (spawn || spot).x, y: (spawn || spot).y, dir: spot.dir || "d", sit: !spawn && !!spot.sit, moving: false, path: [], spot, want: spot, st: "working", seed: h };
+      const a = { id: ag.id, fid: ag.fid || f.id, name: ag.name, col: ag.accent || f.accent, skin: SKIN[h % 5], hair: HAIR[(h >> 3) % 6], x: (spawn || spot).x, y: (spawn || spot).y, dir: spot.dir || "d", sit: !spawn && !!spot.sit, moving: false, path: [], spot, want: spot, st: "working", seed: h, role: ag.r || "", desc: ag.d || "" };
       if (spawn) { a.spot = { x: spawn.x, y: spawn.y, out: [] }; a.sit = false; go(a, spot); }
       return a;
     }
@@ -322,7 +322,7 @@
       const f = r.firm, c = r.counts, names = ["Kickoff", "Drafting", "Review"];
       if (r.isBoard) { hud.innerHTML = `<span class="fl-tag" style="--a:#16181D">PLENARY</span><span>${c.board} firms at the table</span><span>one fact ledger · blind positions</span>`; }
       else hud.innerHTML = `<span class="fl-tag" style="--a:${f.accent}">${f.name.toUpperCase()}</span>${f.shared ? `<span>${f.fids.map(i => SHORT[i] || i).join(" + ")}</span>` : ""}<span class="fl-ph">${r.mode}</span><span>MEETING <b>${c.war || 0}</b></span><span>PARTNERS <b>${c.par || 0}</b></span><span>AT PLENARY <b>${c.away || 0}</b></span><span>DESKS <b>${c.desk || 0}</b></span><span>BENCH <b>${c.bench || 0}</b></span>${c.more || c.benchMore ? `<span class="fl-more">+${(c.more || 0) + (c.benchMore || 0)} more off-screen</span>` : ""}`;
-      drawBar();
+      drawRoster(r); drawBar();
     }
     function drawBar() {
       const chip = (id, name, n, a) => `<button class="chip" data-room="${id}" aria-pressed="${room === id}" style="--a:${a}"><i></i>${name}${n ? ` · ${n}` : ""}</button>`;
@@ -339,17 +339,28 @@
       rooms[room].agents.forEach(a => { const dx = Math.abs(x - a.x), dy = y - (a.y - 8); if (dx < 8 && Math.abs(dy) < 11) { const d = dx + Math.abs(dy); if (d < bd) { bd = d; best = a; } } });
       return best;
     }
-    cv.addEventListener("click", ev => {
-      const a = pick(ev); sel = a;
+    function showTip(a) {
+      sel = a;
       if (!a) { tip.hidden = true; return; }
       const r = rooms[room], fm = r.isBoard ? a.rep : (firmById(a.fid) || r.firm), where = r.isBoard ? "at the boardroom table" : a.sit ? (a.spot.dir === "u" || r.meet.includes(a.spot) ? "in the meeting room" : r.part.includes(a.spot) ? "in the partners room" : "at their desk") : a.st === "idle" ? "on the bench" : "on the way";
       const s = a.st === "asking" ? "asking you" : a.st === "idle" ? "on the bench" : "working";
-      tip.innerHTML = `<b>${a.name}</b><small>${fm.name} · ${s} · ${where}</small><p>${a.task && a.st !== "idle" ? a.task : "Nothing right now."}</p>${a.st === "asking" ? '<button class="send" data-go="needs">Answer</button>' : ""}${!r.isBoard ? '<button class="ghost" data-go="agent">Open in Office</button>' : ""}`;
+      const who = a.role || a.desc ? `<p class="fl-who">${a.role ? `<b>${a.role}</b>` : ""}${a.desc ? `<span>${a.desc}</span>` : ""}</p>` : "";
+      tip.innerHTML = `<b>${a.name}</b><small>${fm.name} · ${s} · ${where}</small>${who}<p>${a.task && a.st !== "idle" ? a.task : "Nothing right now."}</p>${a.st === "asking" ? '<button class="send" data-go="needs">Answer</button>' : ""}${!r.isBoard ? '<button class="ghost" data-go="agent">Open in Office</button>' : ""}`;
       tip.hidden = false; tip.dataset.f = fm.id; tip.dataset.a = a.id;
       const px = Math.min(Math.max(4, a.x * scale - 115), W * scale - 234), py = Math.max(4, (a.y - 40) * scale);
-      tip.style.left = px + wrap.scrollLeft * 0 + "px"; tip.style.top = Math.min(py + 40, H * scale - 120) + "px";
-      const wb = wrap.getBoundingClientRect(); void wb;
-    });
+      tip.style.left = px + "px"; tip.style.top = Math.min(py + 40, H * scale - 150) + "px";
+    }
+    cv.addEventListener("click", ev => showTip(pick(ev)));
+    let rosterKey = "";
+    function drawRoster(r) {
+      if (r.isBoard) { roster.innerHTML = ""; rosterKey = ""; return; }
+      const list = r.firm.agents.map(ag => r.agents.get(ag.fid + "/" + ag.id) || r.agents.get(ag.id) || { fid: ag.fid, id: ag.id, name: ag.name, col: ag.accent, st: api.state(ag.fid, ag.id), role: ag.r, desc: ag.d, x: 160, y: 120, task: "", off: 1 }).sort((x, y) => (x.st === "idle") - (y.st === "idle") || x.name.localeCompare(y.name));
+      const key = r.id + list.map(a => a.fid + a.id + a.st).join();
+      if (key === rosterKey) return; rosterKey = key;
+      roster.innerHTML = `<h3>Everyone in this office · ${f_count(r)}</h3>` + list.map(a => `<button data-ra="${a.fid}/${a.id}" class="${a.st}" style="--a:${a.col}"><i></i>${a.name}</button>`).join("");
+    }
+    const f_count = r => r.firm.agents.length;
+    roster.addEventListener("click", e => { const b = e.target.closest("[data-ra]"); if (!b) return; const [fid, id] = b.dataset.ra.split("/"); const r = rooms[room], ag = r.firm.agents.find(x => x.fid === fid && x.id === id), a = [...r.agents.values()].find(x => x.fid === fid && x.id === id) || { fid, id, name: ag.name, col: ag.accent, st: api.state(fid, id), role: ag.r, desc: ag.d, x: 160, y: 120, task: "", off: 1, spot: { out: [] } }; if (a) { showTip(a); wrap.scrollIntoView({ block: "nearest", behavior: "smooth" }); } });
     tip.addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (!b) return; if (b.dataset.go === "needs") api.goNeeds(); else api.openAgent(tip.dataset.f, tip.dataset.a); });
     bar.addEventListener("click", e => { const b = e.target.closest("[data-room]"); if (!b) return; room = b.dataset.room; sel = null; tip.hidden = true; lastSync = -1e9; drawBar(); });
     window.addEventListener("resize", resize);

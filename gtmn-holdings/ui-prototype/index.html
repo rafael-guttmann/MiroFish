@@ -236,6 +236,10 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
   .pulse{flex-wrap:wrap;gap:10px 16px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.fl-who{display:grid;gap:2px;margin:6px 0 4px}.fl-who b{font-size:13px}.fl-who span{font-size:12.5px;color:var(--ink2);line-height:1.35}
+.fl-roster{margin:12px 0}.fl-roster h3{font:600 13px var(--sans);color:var(--ink2);margin-bottom:8px}
+.fl-roster button{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 9px;margin:0 6px 6px 0;border:1px solid var(--line);border-radius:99px;background:var(--card)}
+.fl-roster button i{width:8px;height:8px;border-radius:50%;background:var(--a)}.fl-roster button.idle{color:var(--ink3)}.fl-roster button.idle i{opacity:.35}
 </style>
 </head>
 <body>
@@ -254,7 +258,7 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 <div class="proto">Clickable prototype · sample data</div>
 <div class="toast" id="toast" role="status"></div>
 <script src="data.js"></script>
-<script src="floor.js?v=8"></script>
+<script src="floor.js?v=10"></script>
 <script src="app.js"></script>
 </body>
 </html>

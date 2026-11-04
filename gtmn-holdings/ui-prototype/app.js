@@ -296,8 +296,9 @@
   setInterval(() => {
     const f = FIRMS[Math.floor(Math.random() * FIRMS.length)], a = f.agents[Math.floor(Math.random() * f.agents.length)], k = f.id + "/" + a.id;
     if (S.state[k] === "asking") return;
-    S.state[k] = S.state[k] === "idle" ? "working" : (Math.random() < .5 ? "idle" : "working");
-    if (S.state[k] === "working") S.task[k] = "Drafting its section of the mandate";
+    S.since = S.since || {};
+    if (S.state[k] === "idle") { S.state[k] = "working"; S.since[k] = Date.now(); S.task[k] = "Drafting its section of the mandate"; }
+    else if (Date.now() - (S.since[k] || 0) > 90000 && Math.random() < .3) S.state[k] = "idle";
     if (Math.random() < .6) say(f.id, f.name, `${a.name} ${lines[Math.floor(Math.random() * lines.length)]}`);
     jobs.forEach(j => { if (j.col === "work") j.p = Math.min(.95, j.p + .02); });
     if (S.tab === "office" || (S.tab === "board" && !S.work)) { const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; }

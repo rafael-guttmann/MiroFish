@@ -354,19 +354,39 @@
       const away = act.find(o => api.convened().includes(o.a.fid)) || null;
       const isP = o => PARTNERS.has(o.a.id), partners = all.filter(o => o !== away && isP(o)).slice(0, 6);
       const work = act.filter(o => o !== away && !isP(o)), bench = all.filter(o => o.st === "idle" && !isP(o));
-      const team = work.filter(o => o.st !== "asking").length > 4;
+      const nw = work.filter(o => o.st !== "asking").length;
+      if (nw > 4) r.team = true; else if (nw <= 2) r.team = false;
+      const team = !!r.team;
       const want = new Map(); let m = 0, p = 0, desk = 0;
       r.desks.forEach(d => d.on = 0);
-      work.slice(0, 12).forEach((o, i) => {
-        let spot = r.desks[i].spot; r.desks[i].on = 1;
+      r.seat = r.seat || new Map();
+      const live = new Set(work.map(o => o.a.fid + "/" + o.a.id));
+      r.seat.forEach((di, key) => { if (!live.has(key)) r.seat.delete(key); });
+      const taken = new Set(r.seat.values());
+      work.slice(0, 12).forEach(o => {
+        const key = o.a.fid + "/" + o.a.id;
+        if (!r.seat.has(key)) { const free = r.desks.findIndex((d, i) => !taken.has(i)); if (free < 0) return; r.seat.set(key, free); taken.add(free); }
+      });
+      work.forEach(o => {
+        const key = o.a.fid + "/" + o.a.id, di = r.seat.get(key);
+        if (di === undefined) return;
+        let spot = r.desks[di].spot; r.desks[di].on = 1;
         if (team && o.st !== "asking" && m < 8) spot = r.meet[m++];
-        if (spot === r.desks[i].spot) desk++;
-        want.set(o.a.fid + "/" + o.a.id, { o, spot });
+        if (spot === r.desks[di].spot) desk++;
+        want.set(key, { o, spot });
       });
       partners.forEach((o, i) => { want.set(o.a.fid + "/" + o.a.id, { o, spot: r.part[i] }); p++; });
       r.mode = team ? "Team meeting" : work.length ? "Solo work" : "Quiet";
       r.phase = 0;
-      bench.slice(0, 9).forEach((o, i) => want.set(o.a.fid + "/" + o.a.id, { o, spot: r.idle[i] }));
+      r.bsit = r.bsit || new Map();
+      const bkeys = new Set(bench.map(o => o.a.fid + "/" + o.a.id));
+      r.bsit.forEach((i, k) => { if (!bkeys.has(k)) r.bsit.delete(k); });
+      const btaken = new Set(r.bsit.values());
+      bench.forEach(o => {
+        const key = o.a.fid + "/" + o.a.id;
+        if (!r.bsit.has(key)) { const free = r.idle.findIndex((s, i) => !btaken.has(i)); if (free < 0) return; r.bsit.set(key, free); btaken.add(free); }
+        want.set(key, { o, spot: r.idle[r.bsit.get(key)] });
+      });
       [...r.agents.keys()].forEach(id => { if (!want.has(id)) r.agents.delete(id); });
       want.forEach(({ o, spot }, id) => {
         let a = r.agents.get(id);

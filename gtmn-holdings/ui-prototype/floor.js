@@ -461,10 +461,15 @@
       const r = rooms[room], fm = r.isBoard ? a.rep : (firmById(a.fid) || r.firm), where = r.isBoard ? "at the boardroom table" : a.sit ? (a.spot.dir === "u" || r.meet.includes(a.spot) ? "in the meeting room" : r.part.includes(a.spot) ? "in the partners room" : "at their desk") : a.st === "idle" ? "on the bench" : "on the way";
       const s = a.st === "asking" ? "asking you" : a.st === "idle" ? "on the bench" : "working";
       const who = a.role || a.desc ? `<p class="fl-who">${a.role ? `<b>${a.role}</b>` : ""}${a.desc ? `<span>${a.desc}</span>` : ""}</p>` : "";
-      tip.innerHTML = `<b>${a.name}</b><small>${fm.name} · ${s} · ${where}</small>${who}<p>${a.task && a.st !== "idle" ? a.task : "Nothing right now."}</p>${a.st === "asking" ? '<button class="send" data-go="needs">Answer</button>' : ""}${!r.isBoard ? '<button class="ghost" data-go="agent">Open in Office</button>' : ""}`;
+      const col = a.col || fm.accent || "#2F6FED";
+      tip.innerHTML = `<button class="tp-x" aria-label="Close">×</button><div class="tp-h"><i style="background:${col}"></i><div><strong>${a.name}</strong><span>${fm.name}</span></div></div><div class="tp-meta"><em class="${a.st}">${s}</em><span>${where}</span></div>${who}<p class="tp-task">${a.task && a.st !== "idle" ? a.task : "Nothing right now."}</p><div class="tp-act">${a.st === "asking" ? '<button class="send" data-go="needs">Answer</button>' : ""}${!r.isBoard ? '<button class="ghost" data-go="agent">Open in Office</button>' : ""}</div>`;
       tip.hidden = false; tip.dataset.f = fm.id; tip.dataset.a = a.id;
-      const px = Math.min(Math.max(4, a.x * scale - 115), W * scale - 234), py = Math.max(4, (a.y - 40) * scale);
-      tip.style.left = px + "px"; tip.style.top = Math.min(py + 40, H * scale - 150) + "px";
+      const cw = W * scale, ch = H * scale, tw = Math.min(264, cw - 8), th = tip.offsetHeight;
+      tip.style.width = tw + "px";
+      let px = a.x * scale + 14, py = a.y * scale - th / 2;
+      if (px + tw > cw - 4) px = a.x * scale - tw - 14;
+      tip.style.left = Math.max(4, Math.min(px, cw - tw - 4)) + "px";
+      tip.style.top = Math.max(4, Math.min(py, ch - th - 4)) + "px";
     }
     cv.addEventListener("click", ev => showTip(pick(ev)));
     let rosterKey = "";
@@ -477,7 +482,7 @@
     }
     const f_count = r => r.firm.agents.length;
     roster.addEventListener("click", e => { const b = e.target.closest("[data-ra]"); if (!b) return; const [fid, id] = b.dataset.ra.split("/"); const r = rooms[room], ag = r.firm.agents.find(x => x.fid === fid && x.id === id), a = [...r.agents.values()].find(x => x.fid === fid && x.id === id) || { fid, id, name: ag.name, col: ag.accent, st: api.state(fid, id), role: ag.r, desc: ag.d, x: 160, y: 120, task: "", off: 1, spot: { out: [] } }; if (a) { showTip(a); wrap.scrollIntoView({ block: "nearest", behavior: "smooth" }); } });
-    tip.addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (!b) return; if (b.dataset.go === "needs") api.goNeeds(); else api.openAgent(tip.dataset.f, tip.dataset.a); });
+    tip.addEventListener("click", e => { if (e.target.closest(".tp-x")) return showTip(null); const b = e.target.closest("[data-go]"); if (!b) return; if (b.dataset.go === "needs") api.goNeeds(); else api.openAgent(tip.dataset.f, tip.dataset.a); });
     bar.addEventListener("click", e => { const b = e.target.closest("[data-room]"); if (!b) return; room = b.dataset.room; sel = null; tip.hidden = true; lastSync = -1e9; drawBar(); });
     window.addEventListener("resize", resize);
 

@@ -107,6 +107,17 @@
       <div class="log"><div><time>${clock()}</time>Read the mandate and the fact ledger</div><div><time>${clock()}</time>Searched 4 sources</div><div><time>${clock()}</time>Wrote 2 pages of draft, kept private from other seats</div></div></div>`;
   }
 
+  /* FLOOR */
+  function floor() { return `${header("The floor", "Watch the firms at work. Tap a room, then tap anyone.")}<div id="floorhost"></div>`; }
+  function mountFloor() {
+    Floor.mount($("#floorhost"), {
+      firms: FIRMS, byId, convened: () => S.convened,
+      state: (f, a) => S.state[f + "/" + a], task: (f, a) => S.task[f + "/" + a],
+      goNeeds: () => { S.tab = "needs"; render(); },
+      openAgent: (f, a) => { S.tab = "office"; S.firm = f; S.agent = a; render(); },
+    });
+  }
+
   /* BOARD */
   function board() {
     const cols = [["wait", "Waiting"], ["work", "Working"], ["need", "Needs you"], ["done", "Done"]];
@@ -168,10 +179,11 @@
 
   function render() {
     const m = $("#main");
-    m.innerHTML = { office, board, needs, new: newDemand }[S.tab]();
+    m.innerHTML = { office, floor, board, needs, new: newDemand }[S.tab]();
     document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === S.tab));
     const b = $("#badge"); b.textContent = cards.length || ""; b.dataset.n = cards.length;
     renderAside();
+    if (S.tab === "floor") mountFloor();
     if (S.tab === "needs") wireNeeds();
     if (S.tab === "new") wireNew();
   }

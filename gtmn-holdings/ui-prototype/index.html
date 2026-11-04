@@ -152,6 +152,18 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 .submit:disabled{opacity:.25;cursor:default}
 .submit:not(:disabled):hover{transform:translateY(-1px)}
 
+/* floor */
+.fl-bar{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:10px;scrollbar-width:thin}
+.fl-bar .chip{flex:none;padding:6px 12px;font-size:13px}
+.fl-wrap{position:relative;height:calc(100vh - 250px);height:calc(100dvh - 250px);min-height:380px;overflow-x:auto;overflow-y:hidden;border:1px solid var(--line);border-radius:var(--r);background:radial-gradient(ellipse at 50% 40%,#FBFAF6,#EDE8DC)}
+.fl-wrap canvas{display:block;cursor:pointer}
+.fl-tip{position:absolute;width:230px;background:#fff;border:1px solid var(--line2);border-radius:12px;padding:12px 14px;box-shadow:0 12px 28px -14px rgba(22,24,29,.4);font-size:14px;z-index:3}
+.fl-tip[hidden]{display:none}
+.fl-tip b{display:block;font-weight:600}.fl-tip small{color:var(--ink3);font-size:12px}.fl-tip p{margin:8px 0;color:var(--ink2)}
+.fl-tip .send{margin-right:8px}
+.fl-legend{font-size:13px;color:var(--ink3);margin-top:10px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.fl-legend .pawn{display:inline-block}
+
 /* aside feed */
 .feed{display:grid;gap:14px;margin-bottom:28px}
 .ev{display:flex;gap:10px;font-size:14px;line-height:1.35;animation:slide .5s var(--ease)}
@@ -193,6 +205,7 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
   <nav class="rail" role="tablist" aria-label="GTMN Holdings">
     <div class="brand">GTMN<small>HOLDINGS</small></div>
     <button class="tab" role="tab" data-tab="office" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M4 20V8l8-4 8 4v12M4 20h16M9 20v-5h6v5M9 11h.01M15 11h.01"/></svg>Office</button>
+    <button class="tab" role="tab" data-tab="floor"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg>Floor</button>
     <button class="tab" role="tab" data-tab="board"><svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="5" height="16" rx="1.2"/><rect x="10" y="4" width="5" height="10" rx="1.2"/><rect x="16.5" y="4" width="4" height="13" rx="1.2"/></svg>Board</button>
     <button class="tab" role="tab" data-tab="needs"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M12 8.5v3M12 13.6h.01"/></svg>Needs you<span class="badge" id="badge" data-n="0"></span></button>
     <button class="tab" role="tab" data-tab="new"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New demand</button>
@@ -203,6 +216,7 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 <div class="proto">Clickable prototype · sample data</div>
 <div class="toast" id="toast" role="status"></div>
 <script src="data.js"></script>
+<script src="floor.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

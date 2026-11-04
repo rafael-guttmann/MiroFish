@@ -28,7 +28,7 @@ ROOT = HERE.parent
 UI = ROOT / "ui-prototype"
 TOKEN = os.environ.get("HOLDINGS_TOKEN", "")
 MAX_BODY = 1_000_000
-FORMATS = {"Excel", "PowerPoint", "Word", "PDF", "JPEG"}
+FORMATS = {"Excel", "PowerPoint", "Word", "PDF", "JPEG", "Markdown"}
 
 charters = {}
 for f in (ROOT / "charters").glob("*.json"):
@@ -197,9 +197,21 @@ class H(BaseHTTPRequestHandler):
     def docfile(self, did, q):
         d = store.one("SELECT * FROM docs WHERE id=?", (did,))
         fmt = (q.get("format") or ["PDF"])[0]
-        if d and fmt == "text":
+        if d and fmt in ("text", "Markdown"):
             f = HERE / "data" / "vault" / f"job-{d['job']}" / "decision-memo.md"
-            return self.send(200, f.read_bytes(), "text/plain; charset=utf-8") if f.is_file() else self.send(404, {"error": "no source"})
+            if not f.is_file():
+                return self.send(404, {"error": "no source"})
+            if fmt == "text":
+                return self.send(200, f.read_bytes(), "text/plain; charset=utf-8")
+            slug = re.sub(r"[^A-Za-z0-9]+", "-", d["name"]).strip("-")[:60] or "deliverable"
+            body = f.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/markdown; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Disposition", f'{"inline" if q.get("inline") else "attachment"}; filename="{slug}.md"')
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            return self.wfile.write(body)
         if not d or fmt not in render.BUILD:
             return self.send(404, {"error": "not found"})
         vault = HERE / "data" / "vault" / f"job-{d['job']}"

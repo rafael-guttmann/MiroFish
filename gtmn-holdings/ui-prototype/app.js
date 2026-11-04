@@ -37,7 +37,7 @@
     { id: 11, t: "Plan House: unit economics deep dive", f: "plan-house", col: "work", p: .8 },
   ];
   const fl = id => id === "plenary" ? PLENARY : byId[id];
-  const FMT = { Excel: "xlsx", PowerPoint: "pptx", Word: "docx", PDF: "pdf", JPEG: "jpg" };
+  const FMT = { Excel: "xlsx", PowerPoint: "pptx", Word: "docx", PDF: "pdf", JPEG: "jpg", Markdown: "md" };
   const ag = (f, i) => byId[f].agents[i % byId[f].agents.length].name;
   let docs = [
     { id: "d1", job: 8, name: "Plenary plugin: technical review", type: "Memo", why: "Decides whether the Plenary plugin is safe to build on.", by: ag("gtmn-cto", 0), ver: 2, fmts: ["PDF"], st: "final", at: "2 Nov, 17:40" },
@@ -69,7 +69,7 @@
       why: "Each firm writes its position blind, then they cross-examine each other inside their own lanes.", def: "If you don't answer, I'll convene the recommended ones." },
   ];
   cards.push({ id: "c5", job: 11, firm: "plan-house", agent: ag("plan-house", 3), kind: "many", fmtDoc: "d5", q: "The unit economics model is ready. Which formats do you want?",
-      opts: [["Excel", "The live model with formulas.", 1], ["PowerPoint", "A short deck with the key charts."], ["Word", "A written memo."], ["PDF", "A fixed copy to share.", 1], ["JPEG", "Charts as images."]],
+      opts: [["Excel", "The live model with formulas.", 1], ["PowerPoint", "A short deck with the key charts."], ["Word", "A written memo."], ["PDF", "A fixed copy to share.", 1], ["JPEG", "Charts as images."], ["Markdown", "Plain text for notes and code."]],
       why: "Each format is built for its purpose, so it is cheaper to ask now than to convert later.", def: "If you don't answer, I'll make Excel and PDF." });
   cards.push({ id: "c6", job: 10, firm: "marketing-house", agent: ag("marketing-house", 0), kind: "one", q: "Which design system should the Orbit Labs brand work follow?", opts: sysOpts(),
       why: "Every layout, colour and font will follow it. Changing it later means redoing the design.", def: "If you don't answer, I'll use the default design system." });
@@ -226,7 +226,7 @@
     let reply = "";
     if (files.length) { files.forEach(n => stds.unshift({ id: "s" + Date.now() + n, name: n, kind: "File", scope: "Added from: " + j.t, at: "Today" })); reply += `Saved ${files.join(", ")} to Design systems. I'll apply it from the next step. Work already delivered stays as it is unless you ask. `; }
     const m = (text || "").match(/excel|power ?point|ppt|word|pdf|jpe?g/gi);
-    if (m) { const names = [...new Set(m.map(x => /excel/i.test(x) ? "Excel" : /pow|ppt/i.test(x) ? "PowerPoint" : /word/i.test(x) ? "Word" : /pdf/i.test(x) ? "PDF" : "JPEG"))]; docs.filter(x => x.job === j.id).forEach(x => names.forEach(n => { if (!x.fmts.includes(n)) x.fmts.push(n); })); reply += `Added ${names.join(", ")} to this demand's deliverables. `; }
+    if (m) { const names = [...new Set(m.map(x => /excel/i.test(x) ? "Excel" : /pow|ppt/i.test(x) ? "PowerPoint" : /word/i.test(x) ? "Word" : /pdf/i.test(x) ? "PDF" : /markdown|\bmd\b/i.test(x) ? "Markdown" : "JPEG"))]; docs.filter(x => x.job === j.id).forEach(x => names.forEach(n => { if (!x.fmts.includes(n)) x.fmts.push(n); })); reply += `Added ${names.join(", ")} to this demand's deliverables. `; }
     if (/stop|pause|hold/i.test(text || "")) reply += "Paused at the end of the current step. Say \"go on\" when ready.";
     else if (text) { if (j.col === "done") { j.col = "work"; j.p = .85; reply += "Reopened. I'll revise the deliverable and keep the earlier version. "; } reply += nowSt ? `I'll adjust from "${nowSt.nm}". Steps already finished stay.` : "I'll pick it up in the next step."; }
     say(j.f, fl(j.f).name, "Change request received: " + ((text || files[0] || "").slice(0, 48)));
@@ -463,7 +463,7 @@
 
 
   /* PREVIEW */
-  const PVF = ["PDF", "Word", "PowerPoint", "Excel", "JPEG"];
+  const PVF = ["PDF", "Word", "PowerPoint", "Excel", "JPEG", "Markdown"];
   const pvSec = d => [["Summary", d.why], ["Key findings", "Three points that matter most for the decision, each with its source and a confidence level."], ["Recommendation", "The desk's recommended path, the main risks, and what would change the answer."], ["Next steps", "Who does what next, with owners and dates."]];
   const real = d => live && /^d\d+$/.test(d.id);
   const mdHtml = t => esc(t).replace(/^#{1,3} (.*)$/gm, "<h4>$1</h4>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/^[-*] (.*)$/gm, "• $1").replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>");
@@ -471,14 +471,16 @@
     const u = `/api/docs/${d.id.slice(1)}/file?format=${k}&inline=1`;
     if (k === "PDF") return host.innerHTML = `<iframe class="pv-frame" src="${u}" title="PDF preview"></iframe>`;
     if (k === "JPEG") return host.innerHTML = `<img class="pv-real" src="${u}" alt="JPEG preview">`;
+    const md = k === "Markdown";
     fetch(`/api/docs/${d.id.slice(1)}/file?format=text`).then(r => r.text()).then(t => {
-      if (S.pv && S.pv.k === k && S.pv.id === d.id) host.innerHTML = `<div class="pv-page"><p>${mdHtml(t.slice(0, 6000))}</p></div><p class="pv-n">Text view of the real content. Download for the full ${k} file.</p>`;
+      if (S.pv && S.pv.k === k && S.pv.id === d.id) host.innerHTML = md ? `<div class="pv-page"><pre class="pv-md">${esc(t.slice(0, 8000))}</pre></div>` : `<div class="pv-page"><p>${mdHtml(t.slice(0, 6000))}</p></div><p class="pv-n">Text view of the real content. Download for the full ${k} file.</p>`;
     }).catch(() => {});
   }
   function pvBody(d, k) {
     const j = jobs.find(x => x.id === d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent, S4 = pvSec(d);
     if (k === "PowerPoint") return `<div class="pv-slides">${[["", d.name, f.name + " · " + d.at], ...S4.map(s => [s[0], s[1], ""])].map((s, i) => `<div class="pv-slide" style="--a:${ac}"><small>${i + 1}</small>${s[0] ? `<h4>${esc(s[0])}</h4>` : ""}<b>${esc(s[1])}</b>${s[2] ? `<p>${esc(s[2])}</p>` : ""}</div>`).join("")}</div>`;
     if (k === "Excel") return `<div class="pv-sheet"><table><thead><tr><th></th><th>Item</th><th>Base</th><th>Low</th><th>High</th></tr></thead><tbody>${["Revenue", "Costs", "Margin", "Capital needed", "Payback (months)"].map((r, i) => `<tr><td>${i + 1}</td><td>${r}</td><td>${(100 + i * 37) % 180}</td><td>${(60 + i * 29) % 120}</td><td>${(140 + i * 41) % 220}</td></tr>`).join("")}</tbody></table><p class="pv-n">Sample figures only. The real file carries the assumption register.</p></div>`;
+    if (k === "Markdown") return `<div class="pv-page"><pre class="pv-md">${esc("# " + d.name + "\n\n## Summary\n" + d.why + "\n\n## Recommendation\n...")}</pre></div>`;
     if (k === "JPEG") return `<div class="pv-img" style="--a:${ac}"><b>${esc(d.name)}</b><span>${esc(f.name)}</span></div>`;
     return `<div class="pv-page"><h3>${esc(d.name)}</h3><small>${esc(f.name)} · ${esc(d.by)} · v${d.ver} · ${d.at}</small>${S4.map(s => `<h4>${esc(s[0])}</h4><p>${esc(s[1])}</p>`).join("")}</div>`;
   }

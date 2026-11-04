@@ -79,7 +79,7 @@ class SimulatedRunner(Runner):
 
     def _ask_formats(self, job_id, firm):
         payload = {"kind": "many", "q": "Which formats do you want for this deliverable?",
-                   "opts": [["Excel", "", 0], ["PowerPoint", "", 0], ["Word", "", 0], ["PDF", "", 1], ["JPEG", "", 0]],
+                   "opts": [["Excel", "", 0], ["PowerPoint", "", 0], ["Word", "", 0], ["PDF", "", 1], ["JPEG", "", 0], ["Markdown", "", 0]],
                    "why": "Each format is built for its purpose.", "def": "PDF if you don't answer."}
         cid = self.s.run("INSERT INTO cards(job,firm,payload,created) VALUES(?,?,?,?)", (job_id, firm, json.dumps(payload), time.time()))
         self.s.event("card", payload["q"], job_id, firm, {"card": cid})

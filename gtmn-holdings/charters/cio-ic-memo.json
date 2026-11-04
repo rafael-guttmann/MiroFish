@@ -159,7 +159,7 @@
   ],
   "veto": [
     {
-      "ground": "GTMN Holdings capital is not committed (its own capital only)"
+      "ground": "GTMN Holdings capital is not being committed"
     }
   ],
   "cannot_veto": [

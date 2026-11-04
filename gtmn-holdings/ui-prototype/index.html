@@ -152,17 +152,26 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 .submit:disabled{opacity:.25;cursor:default}
 .submit:not(:disabled):hover{transform:translateY(-1px)}
 
-/* floor */
-.fl-bar{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:10px;scrollbar-width:thin}
-.fl-bar .chip{flex:none;padding:6px 12px;font-size:13px}
-.fl-wrap{position:relative;height:calc(100vh - 250px);height:calc(100dvh - 250px);min-height:380px;overflow-x:auto;overflow-y:hidden;border:1px solid var(--line);border-radius:var(--r);background:radial-gradient(ellipse at 50% 40%,#FBFAF6,#EDE8DC)}
-.fl-wrap canvas{display:block;cursor:pointer}
-.fl-tip{position:absolute;width:230px;background:#fff;border:1px solid var(--line2);border-radius:12px;padding:12px 14px;box-shadow:0 12px 28px -14px rgba(22,24,29,.4);font-size:14px;z-index:3}
+/* floor: retro console frame */
+.fl-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:8px;scrollbar-width:thin}
+.fl-bar .chip{flex:none;padding:5px 10px;font:700 11px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;border-radius:0;border:2px solid var(--a);box-shadow:2px 2px 0 var(--a);background:#fff;color:var(--ink)}
+.fl-bar .chip i{width:8px;height:8px;border-radius:0;background:var(--a);display:inline-block;margin-right:6px}
+.fl-bar .chip[aria-pressed=true]{background:var(--a);color:#fff;box-shadow:none;transform:translate(2px,2px)}
+.fl-bar .chip[aria-pressed=true] i{background:#fff}
+.fl-hud{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;background:#14161c;color:#cfd3dc;font:700 11px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.08em;padding:9px 12px;border:4px solid #0a0b0e;border-bottom:0}
+.fl-hud b{color:#fff}.fl-ph{color:#ffd54a}.fl-more{color:#8a90a0}
+.fl-tag{background:var(--a);color:#fff;padding:4px 8px;box-shadow:2px 2px 0 #000}
+.fl-wrap{position:relative;overflow-x:auto;overflow-y:hidden;background:#0a0b0e;border:4px solid #0a0b0e;box-shadow:0 0 0 2px #3a3f4b;scrollbar-width:thin}
+.fl-stage{position:relative;margin:0 auto}
+.fl-wrap canvas{display:block;image-rendering:pixelated;cursor:pointer}
+.fl-crt{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.10) 0 1px,transparent 1px 3px)}
+.fl-tip{position:absolute;width:230px;background:#fff;border:3px solid #0a0b0e;box-shadow:4px 4px 0 #0a0b0e;padding:10px 12px;font-size:14px;z-index:3}
 .fl-tip[hidden]{display:none}
-.fl-tip b{display:block;font-weight:600}.fl-tip small{color:var(--ink3);font-size:12px}.fl-tip p{margin:8px 0;color:var(--ink2)}
-.fl-tip .send{margin-right:8px}
-.fl-legend{font-size:13px;color:var(--ink3);margin-top:10px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.fl-legend .pawn{display:inline-block}
+.fl-tip b{display:block;font-weight:700}.fl-tip small{color:var(--ink3);font-size:12px}.fl-tip p{margin:8px 0;color:var(--ink2)}
+.fl-tip .send{margin-right:8px;border-radius:0}
+.fl-legend{font:11px/1.6 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.04em;color:var(--ink3);margin-top:10px}
+.fl-legend b{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.fl-crt{display:none}}
 
 /* aside feed */
 .feed{display:grid;gap:14px;margin-bottom:28px}
@@ -216,7 +225,7 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 <div class="proto">Clickable prototype · sample data</div>
 <div class="toast" id="toast" role="status"></div>
 <script src="data.js"></script>
-<script src="floor.js"></script>
+<script src="floor.js?v=4"></script>
 <script src="app.js"></script>
 </body>
 </html>

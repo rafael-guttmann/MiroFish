@@ -8,7 +8,7 @@
   const initials = n => n.replace(/[^A-Za-zÀ-ÿ ]/g, "").split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, work: null, workBy: "firm", open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), convened: ["gtmn-cto", "dani", "spc-deal-team"] };
+  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, work: null, workBy: "firm", open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), convened: ["gtmn-cto", "dani", "spc-deal-team"] };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
   const firmAgents = f => f.agents.map(a => ({ ...a, st: S.state[f.id + "/" + a.id] }));
@@ -47,7 +47,11 @@
     { id: "d6", job: 5, name: "Noteholder pack, Q4", type: "Report", why: "Quarterly update for noteholders.", by: ag("zencredit-firm", 2), ver: 1, fmts: [], st: "draft", at: "4 Nov, 13:02" },
     { id: "d7", job: 10, name: "Orbit Labs brand brief", type: "Deck", why: "The direction for the brand refresh.", by: ag("marketing-house", 0), ver: 1, fmts: [], st: "draft", at: "4 Nov, 12:30" },
   ];
-  let stds = [{ name: "GTMN master brand guide.pdf", scope: "All firms", at: "28 Oct" }];
+  let stds = [
+    { id: "s1", name: "GTMN master brand guide", kind: "File · PDF", scope: "All firms", at: "28 Oct", def: 1 },
+    { id: "s2", name: "GTMN design system (Claude artifact)", kind: "Link", url: "https://claude.ai/artifact/LxJ9JP4ZDcVijZnq1V7Tr2", scope: "All firms", at: "Today" },
+  ];
+  const sysOpts = () => [...stds.map((s, i) => [s.name, s.kind + (s.def ? " · default" : ""), s.def ? 1 : 0]), ["Let the design skill decide", "No fixed system. The designer picks a fitting look for this piece."]];
 
   let cards = [
     { id: "c1", job: 2, firm: "plan-house", agent: byId["plan-house"].agents[2].name, kind: "one", q: "Which base year should the five-year model use?",
@@ -66,6 +70,8 @@
   cards.push({ id: "c5", job: 11, firm: "plan-house", agent: ag("plan-house", 3), kind: "many", fmtDoc: "d5", q: "The unit economics model is ready. Which formats do you want?",
       opts: [["Excel", "The live model with formulas.", 1], ["PowerPoint", "A short deck with the key charts."], ["Word", "A written memo."], ["PDF", "A fixed copy to share.", 1], ["JPEG", "Charts as images."]],
       why: "Each format is built for its purpose, so it is cheaper to ask now than to convert later.", def: "If you don't answer, I'll make Excel and PDF." });
+  cards.push({ id: "c6", job: 10, firm: "marketing-house", agent: ag("marketing-house", 0), kind: "one", q: "Which design system should the Orbit Labs brand work follow?", opts: sysOpts(),
+      why: "Every layout, colour and font will follow it. Changing it later means redoing the design.", def: "If you don't answer, I'll use the default design system." });
   const feed = [];
   const say = (fid, who, text) => { feed.unshift({ fid, who, text, t: clock() }); if (feed.length > 40) feed.pop(); if ($("#aside")) renderAside(true); };
   say("ogc-dg", "OGC DG", "Seat 6 asked you to approve an indemnity clause");
@@ -212,7 +218,7 @@
     const r = { text: "", typing: 1, t: now }; t.push(r); drawThread(j);
     const d = detail(j), nowSt = d.stages.find(s => s.st === "now") || d.stages.find(s => s.st !== "done");
     let reply = "";
-    if (files.length) { files.forEach(n => stds.unshift({ name: n, scope: "This demand: " + j.t, at: "Today" })); reply += `Saved ${files.join(", ")} to Design standards. I'll apply it from the next step. Work already delivered stays as it is unless you ask. `; }
+    if (files.length) { files.forEach(n => stds.unshift({ id: "s" + Date.now() + n, name: n, kind: "File", scope: "Added from: " + j.t, at: "Today" })); reply += `Saved ${files.join(", ")} to Design systems. I'll apply it from the next step. Work already delivered stays as it is unless you ask. `; }
     const m = (text || "").match(/excel|power ?point|ppt|word|pdf|jpe?g/gi);
     if (m) { const names = [...new Set(m.map(x => /excel/i.test(x) ? "Excel" : /pow|ppt/i.test(x) ? "PowerPoint" : /word/i.test(x) ? "Word" : /pdf/i.test(x) ? "PDF" : "JPEG"))]; docs.filter(x => x.job === j.id).forEach(x => names.forEach(n => { if (!x.fmts.includes(n)) x.fmts.push(n); })); reply += `Added ${names.join(", ")} to this demand's deliverables. `; }
     if (/stop|pause|hold/i.test(text || "")) reply += "Paused at the end of the current step. Say \"go on\" when ready.";
@@ -250,16 +256,25 @@
     return l.length ? l.map(docRow).join("") : `<p class="sub">Nothing produced yet. Files appear here and in the Library as they are made.</p>`;
   }
   function library() {
+    if (S.lib === "design") return designRepo();
     const by = S.lib, groups = new Map();
     docs.forEach(d => { const j = jobs.find(x => x.id === d.job), k = by === "demand" ? j.id : j.f; (groups.get(k) || groups.set(k, []).get(k)).push(d); });
     return `<div class="libwrap"><h1>Library</h1><p class="sub">Everything the firms produce, saved in one place, backed up, and sorted by the demand it came from.</p>
       <div class="bkbar"><b>✓ All ${docs.length} files backed up</b><span>Saved to the vault and copied every night to a second location. Last backup 14:02.</span><button class="chip" data-dlall="1">↓ Download everything</button></div>
-      <div class="wtoggle"><button class="chip" data-libby="demand" aria-pressed="${by === "demand"}">By demand</button><button class="chip" data-libby="firm" aria-pressed="${by === "firm"}">By firm</button></div>
+      <div class="wtoggle"><button class="chip" data-libby="demand" aria-pressed="${by === "demand"}">By demand</button><button class="chip" data-libby="firm" aria-pressed="${by === "firm"}">By firm</button><button class="chip" data-libby="design" aria-pressed="${by === "design"}">Design systems</button></div>
       ${[...groups].map(([k, l]) => { const j = by === "demand" ? jobs.find(x => x.id === k) : null, f = fl(by === "demand" ? j.f : k), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
         return `<section class="lgrp" style="--a:${ac}"><div class="lh"><h2>${esc(by === "demand" ? j.t : f.name)}</h2><small>${by === "demand" ? esc(f.name) + " · " + STL[j.col] : l.length + " files"}</small></div>${l.map(docRow).join("")}</section>`; }).join("")}
-      <h2 style="margin-top:28px">Design standards</h2><p class="sub">Brand guides and templates. New work follows them. You can also attach one inside any demand.</p>
-      ${stds.map(s => `<div class="doc std"><div class="dico">▤</div><div class="dmain"><b>${esc(s.name)}</b><small>${esc(s.scope)} · added ${s.at}</small></div></div>`).join("")}
-      <label class="drop">Drop a design system here or <u>choose a file</u><input type="file" id="stdfile" multiple hidden></label></div>`;
+</div>`;
+  }
+
+  function designRepo() {
+    return `<div class="libwrap"><h1>Library</h1><p class="sub">A separate shelf for design systems. Before design work starts, the firm asks which one to use, or lets the design skill decide.</p>
+      <div class="wtoggle"><button class="chip" data-libby="demand" aria-pressed="false">By demand</button><button class="chip" data-libby="firm" aria-pressed="false">By firm</button><button class="chip" data-libby="design" aria-pressed="true">Design systems</button></div>
+      ${stds.map(s => `<div class="doc std"><div class="dico">${s.url ? "↗" : "▤"}</div><div class="dmain"><b>${esc(s.name)}${s.def ? " <em>default</em>" : ""}</b><small>${esc(s.kind)} · ${esc(s.scope)} · added ${s.at}</small>${s.url ? `<small><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.url)}</a></small>` : ""}<div class="dfm">${s.def ? "" : `<button class="chip" data-sdef="${s.id}">Make default</button>`}</div></div></div>`).join("")}
+      <h2 style="margin-top:22px">Add a design system</h2>
+      <div class="comp" style="position:static"><input id="slink" placeholder="Paste a link" style="flex:1;border:0;outline:0;font:inherit;padding:8px 6px"><button class="send" id="slinkgo">Add link</button></div>
+      <label class="drop">Or drop files here, <u>choose a file</u><input type="file" id="stdfile" multiple hidden></label>
+      <p class="route-note">Backed up with everything else. Links are saved as references; upload the file too if the link may expire.</p></div>`;
   }
 
   /* NEEDS YOU */
@@ -300,6 +315,7 @@
       <textarea class="big" id="demand" placeholder="For example: Should we acquire a Brazilian payments company at a 6x revenue multiple?"></textarea>
       <div class="drop">Drop files here or <label style="text-decoration:underline;cursor:pointer">choose files<input type="file" multiple hidden></label></div>
       <h2 style="margin-top:20px">Deliverable format</h2><div class="routes"><button class="chip" data-nfmt="" aria-pressed="${!S.newFmts.size}">Ask me when it's ready</button>${Object.keys(FMT).map(k => `<button class="chip" data-nfmt="${k}" aria-pressed="${S.newFmts.has(k)}">${k}</button>`).join("")}</div>
+      <h2 style="margin-top:20px">Design system</h2><div class="routes"><button class="chip" data-nds="" aria-pressed="${S.nds === null}">Ask me when design starts</button><button class="chip" data-nds="skill" aria-pressed="${S.nds === "skill"}">Let the design skill decide</button>${stds.map(s => `<button class="chip" data-nds="${s.id}" aria-pressed="${S.nds === s.id}">${esc(s.name)}</button>`).join("")}</div>
       <h2 style="margin-top:20px">Send to</h2>
       <div class="routes"><button class="chip" data-route="" aria-pressed="${S.route === null}">Let the front desk choose</button><button class="chip" data-route="plenary" aria-pressed="${S.route === "plenary"}">Several firms (Plenary)</button>${FIRMS.map(f => `<button class="chip" style="--a:${f.accent}" data-route="${f.id}" aria-pressed="${S.route === f.id}"><i></i>${esc(f.name)}</button>`).join("")}</div>
       <p class="route-note">${note}</p>
@@ -324,7 +340,8 @@
     if (S.tab === "needs") wireNeeds();
     if (S.tab === "new") wireNew();
     if (S.tab === "board" && S.work) wireWork();
-    if (S.tab === "lib") { const sf = $("#stdfile"); if (sf) sf.onchange = () => { [...sf.files].forEach(x => stds.unshift({ name: x.name, scope: "All firms", at: "Today" })); toast("Saved. New work will follow it."); render(); }; }
+    if (S.tab === "lib") { const sf = $("#stdfile"); if (sf) sf.onchange = () => { [...sf.files].forEach(x => stds.push({ id: "s" + Date.now() + x.name, name: x.name, kind: "File", scope: "All firms", at: "Today" })); toast("Saved to Design systems."); render(); };
+      const go = $("#slinkgo"); if (go) go.onclick = () => { const v = $("#slink").value.trim(); if (!/^https:\/\//.test(v)) { toast("Paste a link that starts with https://"); return; } stds.push({ id: "s" + Date.now(), name: v.replace(/^https:\/\//, "").slice(0, 40), kind: "Link", url: v, scope: "All firms", at: "Today" }); toast("Link saved to Design systems."); render(); }; }
   }
   function wireNeeds() {
     const c = cards[0]; if (!c) return;
@@ -350,6 +367,7 @@
   function wireNewSubmit() {
     const d = $("#demand"), s = $("#submit");
     d.oninput = () => s.disabled = !d.value.trim();
+    document.querySelectorAll("[data-nds]").forEach(b => b.onclick = () => { const v = b.dataset.nds, keep = d.value; S.nds = v === "" ? null : v; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     document.querySelectorAll("[data-nfmt]").forEach(b => b.onclick = () => { const v = b.dataset.nfmt, keep = d.value; v ? (S.newFmts.has(v) ? S.newFmts.delete(v) : S.newFmts.add(v)) : S.newFmts.clear(); render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     document.querySelectorAll("[data-route]").forEach(b => b.onclick = () => { const v = b.dataset.route, keep = d.value; S.route = v || null; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     s.onclick = () => {
@@ -357,7 +375,7 @@
       const id = S.route || (/acqui|invest|back|deal/i.test(t) ? "plenary" : "gtmn-cto");
       const jid = Date.now(), jt = t.length > 70 ? t.slice(0, 70) + "…" : t;
       jobs.unshift({ id: jid, t: jt, f: id, col: "wait", p: 0 });
-      docs.unshift({ id: "d" + jid, job: jid, name: "Deliverable: " + jt, type: "Report", why: "Produced for this demand.", by: id === "plenary" ? "Plenary Chair" : ag(id, 0), ver: 1, fmts: [...S.newFmts], st: "draft", at: "Today" }); S.newFmts.clear();
+      docs.unshift({ id: "d" + jid, job: jid, name: "Deliverable: " + jt, type: "Report", why: "Produced for this demand.", by: id === "plenary" ? "Plenary Chair" : ag(id, 0), ver: 1, fmts: [...S.newFmts], st: "draft", at: "Today" }); S.newFmts.clear(); S.nds = null;
       say(id, "Front desk", `New demand routed to ${fl(id).name}`);
       S.route = null; S.tab = "board"; render(); toast(`Sent to ${fl(id).name}. You'll see it move on the board.`);
     };
@@ -373,6 +391,7 @@
     else if (t.dataset.showall) { S.showAll = true; render(); }
     else if (t.dataset.goneeds) { S.tab = "needs"; render(); }
     else if (t.dataset.work) { S.work = +t.dataset.work; S.open = new Set([S.work + ":" + detail(jobs.find(j => j.id === S.work)).cur]); render(); $("#main").scrollTop = 0; }
+    else if (t.dataset.sdef) { stds.forEach(s => s.def = s.id === t.dataset.sdef ? 1 : 0); keep(); }
     else if (t.dataset.libby) { S.lib = t.dataset.libby; render(); }
     else if (t.dataset.fmtopen) { S.fmtOpen = S.fmtOpen === t.dataset.fmtopen ? null : t.dataset.fmtopen; S.fmtSel.clear(); keep(); }
     else if (t.dataset.fmt) { const k = t.dataset.fmt; S.fmtSel.has(k) ? S.fmtSel.delete(k) : S.fmtSel.add(k); keep(); }

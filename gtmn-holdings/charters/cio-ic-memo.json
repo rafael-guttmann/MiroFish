@@ -153,13 +153,13 @@
     }
   ],
   "owns": [
-    "whether LEGACY or Delta capital is committed",
+    "whether GTMN Holdings capital is committed",
     "portfolio fit",
     "liquidity and obligations on the family balance sheet"
   ],
   "veto": [
     {
-      "ground": "LEGACY or Delta capital is not committed (its own capital only)"
+      "ground": "GTMN Holdings capital is not committed (its own capital only)"
     }
   ],
   "cannot_veto": [
@@ -169,7 +169,7 @@
     "price"
   ],
   "pen_default_for": [
-    "commit or do-not-commit memos on LEGACY or Delta capital"
+    "commit or do-not-commit memos on GTMN Holdings capital"
   ],
   "senior_panel": [
     "cio-swensen",

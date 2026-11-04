@@ -1,6 +1,6 @@
 """Holdings server: front desk, job board, event stream, cards, library.
 
-Run:  python3 app.py            (http://127.0.0.1:8799, also serves ../ui-prototype)
+Run:  python3 app.py            (http://127.0.0.1:8841, also serves ../ui-prototype)
 Env:  HOLDINGS_RUNNER=simulated|sdk   HOLDINGS_TOKEN=<secret>   HOLDINGS_HOST  HOLDINGS_PORT
 Binds to localhost by default. Set HOLDINGS_TOKEN before exposing it anywhere else.
 """
@@ -30,6 +30,11 @@ for f in (ROOT / "charters").glob("*.json"):
 
 store = Store(HERE / "data" / "holdings.db")
 runner = AgentSDKRunner() if os.environ.get("HOLDINGS_RUNNER") == "sdk" else SimulatedRunner(store, charters)
+
+
+def approved(firm):
+    r = store.one("SELECT decision FROM charter_reviews WHERE charter=? ORDER BY id DESC LIMIT 1", (firm,))
+    return bool(r) and r["decision"] == "approved"
 
 
 def route_firm(text, requested):
@@ -116,6 +121,8 @@ class H(BaseHTTPRequestHandler):
                 return self.send(400, {"error": "title required"})
             fmts = [f for f in b.get("formats", []) if f in FORMATS]
             firm = route_firm(title, b.get("firm"))
+            if firm in charters and not approved(firm):
+                return self.send(409, {"error": "charter not approved", "firm": firm, "name": charters[firm]["name"]})
             jid = store.run("INSERT INTO jobs(title,firm,formats,design,created) VALUES(?,?,?,?,?)",
                             (title, firm, json.dumps(fmts), b.get("design"), time.time()))
             store.event("routed", f"Front desk routed the demand to {firm}", jid, firm)
@@ -135,6 +142,10 @@ class H(BaseHTTPRequestHandler):
             if not c:
                 return self.send(404, {"error": "no open card"})
             store.run("UPDATE cards SET answer=?, state='answered' WHERE id=?", (str(b.get("answer", ""))[:2000], m[1]))
+            payload = json.loads(c["payload"])
+            if payload.get("q", "").startswith("Which formats"):
+                got = [f for f in sorted(FORMATS) if f in str(b.get("answer", ""))]
+                store.run("UPDATE docs SET formats=? WHERE job=?", (json.dumps(got or ["PDF"]), c["job"]))
             store.event("answer", "Rafael answered a card", c["job"], c["firm"])
             runner.card_answered(int(m[1]))
             return self.send(200, {"ok": True})
@@ -182,6 +193,6 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    host, port = os.environ.get("HOLDINGS_HOST", "127.0.0.1"), int(os.environ.get("HOLDINGS_PORT", "8799"))
+    host, port = os.environ.get("HOLDINGS_HOST", "127.0.0.1"), int(os.environ.get("HOLDINGS_PORT", "8841"))
     print(f"Holdings server on http://{host}:{port}  runner={type(runner).__name__}  firms={len(charters)}")
     ThreadingHTTPServer((host, port), H).serve_forever()

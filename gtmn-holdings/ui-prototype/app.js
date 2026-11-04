@@ -8,6 +8,7 @@
   const initials = n => n.replace(/[^A-Za-zÀ-ÿ ]/g, "").split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+  let live = false, sig = "";
   const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, work: null, workBy: "firm", open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), convened: ["gtmn-cto", "dani", "spc-deal-team"] };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
@@ -213,6 +214,7 @@
       <div class="comp"><label class="att" title="Attach a file or design system"><svg viewBox="0 0 24 24"><path d="M20 11l-8 8a5 5 0 01-7-7l8-8a3.5 3.5 0 015 5l-8 8a2 2 0 01-3-3l7-7"/></svg><input type="file" id="sfile" multiple hidden></label><textarea id="snote" rows="1" placeholder="Change something, add a request, or attach a design system…"></textarea><button class="send" id="ssend" disabled>Send</button></div></div>`;
   }
   function steer(j, text, files) {
+    if (live && j.live && text) post("/api/jobs/" + j.id + "/steer", { text }).then(pull);
     const t = thr(j), now = clock();
     t.push({ me: 1, text: text || "(file attached)", files, t: now });
     const r = { text: "", typing: 1, t: now }; t.push(r); drawThread(j);
@@ -295,6 +297,7 @@
   }
   function answer(text, how) {
     const c = cards[0]; if (!c) return;
+    if (live && c.srv) post("/api/cards/" + c.srv + "/answer", { answer: text }).then(() => setTimeout(pull, 400));
     const el = $("#qcard"); if (el) el.classList.add("out");
     setTimeout(() => {
       cards.shift(); S.sel.clear();
@@ -325,7 +328,7 @@
   /* ASIDE (desktop) */
   function renderAside(feedOnly) {
     const a = $("#aside");
-    a.innerHTML = `${cards.length ? `<h2>Needs you · ${cards.length}</h2>${cards.slice(0, 2).map(c => `<button class="mini" data-goneeds="1"><b>${esc(c.q)}</b><small>${esc(fl(c.firm).name)}</small></button>`).join("")}<div style="height:22px"></div>` : ""}<h2>Live</h2><div class="feed">${feed.slice(0, 12).map(e => `<div class="ev"><span class="pawn" style="--a:${fl(e.fid).accent === "#FFFFFF" ? "#16181D" : fl(e.fid).accent}">${initials(e.who)}</span><div>${esc(e.text)}<time>${e.t} · ${esc(e.who)}</time></div></div>`).join("")}</div>`;
+    a.innerHTML = `${cards.length ? `<h2>Needs you · ${cards.length}</h2>${cards.slice(0, 2).map(c => `<button class="mini" data-goneeds="1"><b>${esc(c.q)}</b><small>${esc(fl(c.firm).name)}</small></button>`).join("")}<div style="height:22px"></div>` : ""}<h2>${live ? "Live" : "Live · demo data"}</h2><div class="feed">${feed.slice(0, 12).map(e => `<div class="ev"><span class="pawn" style="--a:${fl(e.fid).accent === "#FFFFFF" ? "#16181D" : fl(e.fid).accent}">${initials(e.who)}</span><div>${esc(e.text)}<time>${e.t} · ${esc(e.who)}</time></div></div>`).join("")}</div>`;
   }
 
   function toast(t) { const e = $("#toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.h); toast.h = setTimeout(() => e.classList.remove("on"), 2600); }
@@ -374,7 +377,7 @@
     if (S.tab === "new") wireNew();
     if (S.tab === "board" && S.work) wireWork();
     if (S.tab === "lib") { const sf = $("#stdfile"); if (sf) sf.onchange = () => { [...sf.files].forEach(x => stds.push({ id: "s" + Date.now() + x.name, name: x.name, kind: "File", scope: "All firms", at: "Today" })); toast("Saved to Design systems."); render(); };
-      const go = $("#slinkgo"); if (go) go.onclick = () => { const v = $("#slink").value.trim(); if (!/^https:\/\//.test(v)) { toast("Paste a link that starts with https://"); return; } stds.push({ id: "s" + Date.now(), name: v.replace(/^https:\/\//, "").slice(0, 40), kind: "Link", url: v, scope: "All firms", at: "Today" }); toast("Link saved to Design systems."); render(); }; }
+      const go = $("#slinkgo"); if (go) go.onclick = () => { const v = $("#slink").value.trim(); if (!/^https:\/\//.test(v)) { toast("Paste a link that starts with https://"); return; } if (live) post("/api/design-systems", { name: v.replace(/^https:\/\//, "").slice(0, 40), url: v }); stds.push({ id: "s" + Date.now(), name: v.replace(/^https:\/\//, "").slice(0, 40), kind: "Link", url: v, scope: "All firms", at: "Today" }); toast("Link saved to Design systems."); render(); }; }
   }
   function wireNeeds() {
     const c = cards[0]; if (!c) return;
@@ -405,6 +408,15 @@
     document.querySelectorAll("[data-route]").forEach(b => b.onclick = () => { const v = b.dataset.route, keep = d.value; S.route = v || null; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     s.onclick = () => {
       const t = d.value.trim(); if (!t) return;
+      if (live) {
+        post("/api/jobs", { title: t, firm: S.route || undefined, formats: [...S.newFmts], design: S.nds }).then(async r => {
+          const j = await r.json();
+          if (r.status === 409) { toast(`${j.name}'s charter isn't approved yet. Approve it in Charters first.`); return; }
+          if (!r.ok) { toast("The server refused this demand."); return; }
+          S.newFmts.clear(); S.nds = null; S.route = null; S.tab = "board"; await pull(); render(); toast(`Sent to ${fl(j.firm).name}. Watch it on the board.`);
+        }).catch(() => toast("Could not reach the server."));
+        return;
+      }
       const id = S.route || (/acqui|invest|back|deal/i.test(t) ? "plenary" : "gtmn-cto");
       const jid = Date.now(), jt = t.length > 70 ? t.slice(0, 70) + "…" : t;
       jobs.unshift({ id: jid, t: jt, f: id, col: "wait", p: 0 });
@@ -440,9 +452,46 @@
     else if (t.dataset.job) { const j = jobs.find(x => x.id == t.dataset.job); if (j.col === "need") { S.tab = "needs"; const i = cards.findIndex(c => c.job === j.id); if (i > 0) cards.unshift(...cards.splice(i, 1)); render(); } }
   });
 
+  /* LIVE ENGINE: used when the page is served by server/app.py */
+  const COL = { waiting: "wait", working: "work", asking: "need", done: "done" };
+  const post = (u, b) => fetch(u, { method: "POST", body: JSON.stringify(b) });
+  const getj = u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.json(); });
+  const when = t => new Date(t * 1000).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  async function pull() {
+    let js, cs, lb;
+    try { [js, cs, lb] = await Promise.all([getj("/api/jobs"), getj("/api/cards"), getj("/api/library")]); } catch (e) { return; }
+    const docOf = job => (lb.docs.find(d => d.job === job) || {}).id;
+    jobs = js.map(j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, live: 1 }));
+    cards = cs.map(c => { const p = c.payload, f = byId[c.firm]; return { id: "c" + c.id, srv: c.id, job: c.job, firm: c.firm, agent: f ? f.agents[0].name : "Plenary Chair", kind: p.kind, q: p.q, opts: p.opts, why: p.why, def: p.def, fmtDoc: p.q.startsWith("Which formats") ? "d" + docOf(c.job) : undefined }; });
+    docs = lb.docs.map(d => ({ id: "d" + d.id, job: d.job, name: d.name, type: d.kind, why: "Produced for this demand.", by: agName(d.by), ver: d.version, fmts: JSON.parse(d.formats || "[]"), st: "final", at: when(d.created) }));
+    if (lb.design_systems.length) stds = lb.design_systems.map(s => ({ id: "s" + s.id, name: s.name, kind: s.kind === "link" ? "Link" : "File", url: s.url, def: s.is_default, scope: "All firms", at: when(s.created) }));
+    Object.keys(S.state).forEach(k => { S.state[k] = "idle"; });
+    jobs.forEach(j => { const f = byId[j.f]; if (!f || (j.col !== "work" && j.col !== "need")) return; f.agents.slice(0, 4).forEach(a => { S.state[f.id + "/" + a.id] = j.col === "need" ? "asking" : "working"; S.task[f.id + "/" + a.id] = "Working on: " + j.t; }); });
+    const s = JSON.stringify([jobs, cards, docs, stds]);
+    if (s === sig) return; sig = s;
+    const ae = document.activeElement, typing = ae && /TEXTAREA|INPUT/.test(ae.tagName);
+    if (!typing && ["office", "board", "needs", "lib"].includes(S.tab)) keep(); else { updCb(); renderAside(); const b = $("#badge"); b.textContent = cards.length || ""; b.dataset.n = cards.length; }
+  }
+  async function goLive() {
+    try { const r = await fetch("/api/firms"); if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) return; } catch (e) { return; }
+    live = true; jobs = []; cards = []; docs = []; sig = "";
+    try {
+      const server = Object.fromEntries((await getj("/api/charters")).map(x => [x.charter, x.decision]));
+      for (const id in rev) if (rev[id].decision !== "proposed" && server[id] !== rev[id].decision) await post("/api/charters/" + id + "/review", { decision: rev[id].decision, note: rev[id].note || "" });
+      const lb = await getj("/api/library");
+      if (!lb.design_systems.length) for (const s of stds) if (s.url) await post("/api/design-systems", { name: s.name, url: s.url });
+    } catch (e) {}
+    await pull(); setInterval(pull, 2500);
+    const es = new EventSource("/api/stream");
+    es.onmessage = m => { const e = JSON.parse(m.data), id = byId[e.firm] ? e.firm : "plenary"; say(id, fl(id).name, e.text); };
+    render();
+  }
+  goLive();
+
   /* gentle live simulation */
   const lines = ["finished a section", "added 6 facts to the ledger", "is cross-checking a source", "started a new draft", "sent a note to the desk"];
   setInterval(() => {
+    if (live) return;
     const f = FIRMS[Math.floor(Math.random() * FIRMS.length)], a = f.agents[Math.floor(Math.random() * f.agents.length)], k = f.id + "/" + a.id;
     if (S.state[k] === "asking") return;
     S.since = S.since || {};

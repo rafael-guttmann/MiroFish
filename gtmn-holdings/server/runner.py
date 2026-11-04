@@ -136,9 +136,29 @@ class AgentSDKRunner(Runner):
             txt = txt.split("---", 2)[2]
         return txt.strip() + "\n\nYou work for GTMN Holdings. Answer in plain prose under 450 words. You see only the mandate below."
 
-    def _say(self, system, user, max_tokens=1800):
-        r = self.client.messages.create(model=self.model, max_tokens=max_tokens, system=system,
-                                        messages=[{"role": "user", "content": user}])
+    TOOLS = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
+             {"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": 4}]
+
+    def _say(self, system, user, max_tokens=1800, tools=False, sources=None, job_id=None, who=""):
+        msgs = [{"role": "user", "content": user}]
+        for _ in range(6):
+            kw = {"tools": self.TOOLS} if tools else {}
+            r = self.client.beta.messages.create(model=self.model, max_tokens=max_tokens, system=system,
+                                                 messages=msgs, betas=["web-fetch-2025-09-10"], **kw)
+            for b in r.content:
+                if b.type == "server_tool_use" and job_id:
+                    arg = b.input.get("query") or b.input.get("url") or ""
+                    self.s.event("tool", f"{who} used {b.name}: {str(arg)[:90]}", job_id, "gtmn-cto")
+                if sources is not None:
+                    if b.type == "web_search_tool_result" and isinstance(b.content, list):
+                        sources.update({x.url: x.title for x in b.content if getattr(x, "url", None)})
+                    elif b.type == "web_fetch_tool_result":
+                        u = getattr(b.content, "url", None)
+                        if u:
+                            sources[u] = u
+            if r.stop_reason != "pause_turn":
+                break
+            msgs = [msgs[0], {"role": "assistant", "content": r.content}]
         return "".join(b.text for b in r.content if b.type == "text").strip()
 
     def _stage(self, job_id, firm, i, n, label):
@@ -154,10 +174,13 @@ class AgentSDKRunner(Runner):
             s.event("start", "Office of the CTO picked up the demand", job_id, firm)
             self._stage(job_id, firm, 0, 4, "Desk framed the mandate; seats start blind")
             seats = list(self.SEAT_NAMES)
+            sources = {}
             out = {}
 
             def work(seat):
-                out[seat] = self._say(self._persona(seat), f"Mandate: {title}\n\nGive your independent position: verdict, the 3 things that matter most from your lane, and what would change your mind.")
+                out[seat] = self._say(self._persona(seat) + "\nUse web_search and web_fetch to check facts you rely on. Cite sources by name and URL, and mark anything you could not verify as UNVERIFIED.",
+                                      f"Mandate: {title}\n\nGive your independent position: verdict, the 3 things that matter most from your lane, and what would change your mind.",
+                                      2500, True, sources, job_id, self.SEAT_NAMES[seat])
                 s.event("step", f"{self.SEAT_NAMES[seat]} filed a blind position", job_id, firm)
             ts = [threading.Thread(target=work, args=(x,)) for x in seats]
             [t.start() for t in ts]
@@ -182,12 +205,18 @@ class AgentSDKRunner(Runner):
             steer = "\n".join(self.notes.get(job_id, []))
             memo = self._say("You are the orchestrating desk of the Office of the CTO at GTMN Holdings. Write a decision memo in a senior consulting partner's register: answer first, then reasoning, preserved dissent, risks, next steps. Markdown, under 900 words.",
                              f"Mandate: {title}\n\nBlind positions:\n{positions}\n\nRafael's decision: {answer}\n\nRafael's steering notes (apply them): {steer or 'none'}", 2600)
+            self._stage(job_id, firm, 3, 5, "Verifier is checking every claim in the memo")
+            ver = self._say("You are the independent verifier for the Office of the CTO. You did not write this memo. Check its factual claims (names, dates, numbers, quotes, product capabilities) using web_search and web_fetch. Output markdown: a table | Claim | Verdict (VERIFIED / UNVERIFIED / CONTRADICTED) | Evidence and URL |, then a one-line overall verdict: PASS, PASS WITH FLAGS, or FAIL. Do not soften a CONTRADICTED claim.",
+                            f"Memo to verify:\n\n{memo}\n\nSources the authors already consulted:\n" + "\n".join(f"- {v} {k}" for k, v in sources.items()),
+                            3000, True, sources, job_id, "Verifier")
+            verdict = "FAIL" if "FAIL" in ver.split("verdict")[-1].upper()[:80] else ("PASS WITH FLAGS" if "FLAGS" in ver.upper()[-300:] else "PASS")
+            s.event("verify", f"Verification result: {verdict}", job_id, firm)
             vault = self.root / "server" / "data" / "vault" / f"job-{job_id}"
             vault.mkdir(parents=True, exist_ok=True)
-            (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Blind positions\n\n{positions}\n")
+            (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Blind positions\n\n{positions}\n\n---\n## Verification ({verdict})\n\n{ver}\n\n## Sources consulted\n\n" + "\n".join(f"- {v}: {k}" for k, v in sources.items()) + "\n")
             fmts = j["formats"]
             s.run("UPDATE jobs SET status='done', progress=1, stage=3 WHERE id=?", (job_id,))
-            s.run("INSERT INTO docs(job,name,kind,by,formats,created) VALUES(?,?,?,?,?,?)", (job_id, title, "Decision memo", "cto-desk", fmts, time.time()))
+            s.run("INSERT INTO docs(job,name,kind,by,formats,created) VALUES(?,?,?,?,?,?)", (job_id, title, "Decision memo (verified: " + verdict + ")", "cto-desk", fmts, time.time()))
             s.event("done", "Memo is in the vault and the Library.", job_id, firm)
             if not json.loads(fmts):
                 self.sim._ask_formats(job_id, firm)

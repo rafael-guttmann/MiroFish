@@ -137,17 +137,18 @@ class AgentSDKRunner(Runner):
         return txt.strip() + "\n\nYou work for GTMN Holdings. Answer in plain prose under 450 words. You see only the mandate below."
 
     TOOLS = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
-             {"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": 4}]
+             {"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": 4},
+             {"type": "code_execution_20250522", "name": "code_execution"}]
 
     def _say(self, system, user, max_tokens=1800, tools=False, sources=None, job_id=None, who=""):
         msgs = [{"role": "user", "content": user}]
         for _ in range(6):
             kw = {"tools": self.TOOLS} if tools else {}
             r = self.client.beta.messages.create(model=self.model, max_tokens=max_tokens, system=system,
-                                                 messages=msgs, betas=["web-fetch-2025-09-10"], **kw)
+                                                 messages=msgs, betas=["web-fetch-2025-09-10", "code-execution-2025-05-22"], **kw)
             for b in r.content:
                 if b.type == "server_tool_use" and job_id:
-                    arg = b.input.get("query") or b.input.get("url") or ""
+                    arg = b.input.get("query") or b.input.get("url") or (b.input.get("code") or "").strip().splitlines()[0:1] and b.input["code"].strip().splitlines()[0] or ""
                     self.s.event("tool", f"{who} used {b.name}: {str(arg)[:90]}", job_id, "gtmn-cto")
                 if sources is not None:
                     if b.type == "web_search_tool_result" and isinstance(b.content, list):
@@ -178,7 +179,7 @@ class AgentSDKRunner(Runner):
             out = {}
 
             def work(seat):
-                out[seat] = self._say(self._persona(seat) + "\nUse web_search and web_fetch to check facts you rely on. Cite sources by name and URL, and mark anything you could not verify as UNVERIFIED.",
+                out[seat] = self._say(self._persona(seat) + "\nUse web_search and web_fetch to check facts you rely on, and code_execution (a sandbox) to compute any number you cite instead of estimating it. Cite sources by name and URL, and mark anything you could not verify as UNVERIFIED.",
                                       f"Mandate: {title}\n\nGive your independent position: verdict, the 3 things that matter most from your lane, and what would change your mind.",
                                       2500, True, sources, job_id, self.SEAT_NAMES[seat])
                 s.event("step", f"{self.SEAT_NAMES[seat]} filed a blind position", job_id, firm)

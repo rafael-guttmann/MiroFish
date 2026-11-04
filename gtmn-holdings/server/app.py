@@ -154,7 +154,7 @@ class H(BaseHTTPRequestHandler):
             firm = route_firm(title, b.get("firm"))
             if firm in charters and not approved(firm):
                 return self.send(409, {"error": "charter not approved", "firm": firm, "name": charters[firm]["name"]})
-            picks = [f for f in b.get("firms", []) if f in charters][:4] if firm == "plenary" else []
+            picks = [f for f in b.get("firms", []) if f in charters] if firm == "plenary" else []
             if picks:
                 if len(picks) < 2:
                     return self.send(400, {"error": "a plenary needs at least two firms"})

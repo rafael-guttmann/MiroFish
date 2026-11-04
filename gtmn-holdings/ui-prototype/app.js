@@ -325,7 +325,7 @@
       <div class="drop">Drop files here or <label style="text-decoration:underline;cursor:pointer">choose files<input type="file" multiple hidden></label></div>
       <h2 style="margin-top:20px">Deliverable format</h2><div class="routes"><button class="chip" data-nfmt="" aria-pressed="${!S.newFmts.size}">Ask me when it's ready</button>${Object.keys(FMT).map(k => `<button class="chip" data-nfmt="${k}" aria-pressed="${S.newFmts.has(k)}">${k}</button>`).join("")}</div>
       <h2 style="margin-top:20px">Design system</h2><div class="routes"><button class="chip" data-nds="" aria-pressed="${S.nds === null}">Ask me when design starts</button><button class="chip" data-nds="skill" aria-pressed="${S.nds === "skill"}">Let the design skill decide</button>${stds.map(s => `<button class="chip" data-nds="${s.id}" aria-pressed="${S.nds === s.id}">${esc(s.name)}</button>`).join("")}</div>
-      <h2 style="margin-top:20px">Send to <small style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.7">· tap one firm, or several to convene them in a Plenary (up to 4)</small></h2>
+      <h2 style="margin-top:20px">Send to <small style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.7">· tap one firm, or as many as you want to convene them in a Plenary</small></h2>
       <div class="routes"><button class="chip" data-route="" aria-pressed="${S.route === null}">Let the front desk choose</button><button class="chip" data-route="plenary" aria-pressed="${S.route === "plenary"}">Several firms (Plenary)</button>${FIRMS.map(f => `<button class="chip" style="--a:${f.accent}" data-route="${f.id}" aria-pressed="${S.picks.has(f.id)}"><i></i>${esc(f.name)}</button>`).join("")}</div>
       <p class="route-note">${note}</p>
       <button class="submit" id="submit" disabled>Send demand</button></div>`;
@@ -414,7 +414,7 @@
     document.querySelectorAll("[data-nfmt]").forEach(b => b.onclick = () => { const v = b.dataset.nfmt, keep = d.value; v ? (S.newFmts.has(v) ? S.newFmts.delete(v) : S.newFmts.add(v)) : S.newFmts.clear(); render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     document.querySelectorAll("[data-route]").forEach(b => b.onclick = () => { const v = b.dataset.route, keep = d.value;
       if (!v || v === "plenary") { S.picks.clear(); S.route = v || null; }
-      else { if (S.picks.has(v)) S.picks.delete(v); else if (S.picks.size < 4) S.picks.add(v); else toast("A Plenary seats at most 4 firms."); S.route = S.picks.size === 0 ? null : S.picks.size === 1 ? [...S.picks][0] : "plenary"; } render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
+      else { if (S.picks.has(v)) S.picks.delete(v); else S.picks.add(v); S.route = S.picks.size === 0 ? null : S.picks.size === 1 ? [...S.picks][0] : "plenary"; } render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     s.onclick = () => {
       const t = d.value.trim(); if (!t) return;
       if (live) {

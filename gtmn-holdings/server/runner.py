@@ -7,6 +7,7 @@ stub until the CTO firm is wired to the Claude Agent SDK.
 import json
 from pathlib import Path
 import os
+import cost
 import granola
 import threading
 import time
@@ -241,8 +242,10 @@ class AgentSDKRunner(Runner):
                        "commitments or counterparties that bear on the mandate; quote only what you read, and never send meeting content into web searches.")
         for _ in range(10 if deep else 6):
             kw = {"tools": (self.DEEP_TOOLS if deep else self.TOOLS) + (granola.TOOLS if use_g else [])} if tools else {}
+            cost.gate(self.s, job_id, who)
             r = self.client.beta.messages.create(model=self.model, max_tokens=max_tokens, system=system,
                                                  messages=msgs, betas=["web-fetch-2025-09-10", "code-execution-2025-05-22"], **kw)
+            cost.record(self.s, job_id, self.model, getattr(r, "usage", None))
             for b in r.content:
                 if b.type == "server_tool_use" and job_id:
                     arg = b.input.get("query") or b.input.get("url") or (b.input.get("code") or "").strip().splitlines()[0:1] and b.input["code"].strip().splitlines()[0] or ""

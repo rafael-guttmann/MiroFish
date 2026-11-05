@@ -20,7 +20,12 @@ body{font:16px/1.45 var(--sans);color:var(--ink);background:var(--paper);-webkit
 button,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.app{display:grid;grid-template-columns:84px 1fr 340px;grid-template-rows:100vh;height:100vh;height:100dvh}
+.app{display:grid;grid-template-columns:84px 1fr 340px;grid-template-rows:calc(100vh - var(--cb,0px));height:calc(100vh - var(--cb,0px));height:calc(100dvh - var(--cb,0px))}
+#costbar{position:sticky;top:0;z-index:50;height:38px;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--night);color:#fff;font:13px var(--sans)}#costbar[hidden]{display:none}
+#costbar{white-space:nowrap;overflow:hidden}#costbar b{font-weight:600;font-variant-numeric:tabular-nums}.cb-track{flex:1;max-width:420px;height:8px;border-radius:99px;background:#ffffff26;overflow:hidden}.cb-fill{height:100%;border-radius:99px;background:#4ade80;transition:width .6s,background .3s}.cb-fill.warn{background:#fbbf24}.cb-fill.hot{background:#f87171}
+#costbar button{font:600 12px var(--sans);color:#fff;background:#ffffff1f;border:0;border-radius:8px;padding:6px 10px;cursor:pointer}#costbar button:hover{background:#ffffff38}#costbar .cb-go{background:#f59e0b;color:#1a1204}.cb-msg{color:#fcd34d;font-weight:600}.cb-sp{margin-left:auto}
+.cb-pop{position:fixed;top:44px;right:12px;z-index:60;width:300px;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px #0003;padding:14px;font:13px/1.45 var(--sans)}.cb-pop h4{margin:0 0 8px;font-size:13px}.cb-pop label{display:block;margin:8px 0 4px;color:var(--ink2)}.cb-pop input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:14px var(--sans)}.cb-pop .row{display:flex;gap:8px;margin-top:10px}.cb-pop button{font:600 13px var(--sans);padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer}.cb-pop button.pri{background:var(--night);color:#fff;border-color:var(--night)}.cb-pop small{color:var(--ink3)}
+@media(max-width:760px){#costbar{gap:6px;padding:0 8px}.cb-hide,.cb-msg{display:none}.cb-track{min-width:30px}#costbar.paused .cb-track{display:none}#costbar button{padding:6px 8px}}
 .rail{background:var(--night);color:#fff;display:flex;flex-direction:column;align-items:center;padding:18px 0;gap:6px}
 .brand{font:600 15px var(--serif);letter-spacing:.04em;margin-bottom:18px;text-align:center;line-height:1.1}
 .brand small{display:block;font:500 9px var(--sans);letter-spacing:.18em;opacity:.6;margin-top:3px}
@@ -320,6 +325,7 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 </style>
 </head>
 <body>
+<div id="costbar" role="status" aria-live="polite" hidden></div>
 <div class="app">
   <nav class="rail" role="tablist" aria-label="GTMN Holdings">
     <div class="brand">GTMN<small>HOLDINGS</small></div>
@@ -339,6 +345,6 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 <script src="data.js"></script>
 <script src="charters.js"></script>
 <script src="floor.js?v=17"></script>
-<script src="app.js?v=31"></script>
+<script src="app.js?v=33"></script>
 </body>
 </html>

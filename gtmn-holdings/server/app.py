@@ -5,6 +5,7 @@ Env:  HOLDINGS_RUNNER=simulated|sdk   HOLDINGS_TOKEN=<secret>   HOLDINGS_HOST  H
 Binds to localhost by default. Set HOLDINGS_TOKEN before exposing it anywhere else.
 """
 import json
+import cost
 import os
 import re
 import time
@@ -159,6 +160,10 @@ class H(BaseHTTPRequestHandler):
                                     "partners": c.get("senior_panel", []), "outputs": c.get("outputs", [])} for c in charters.values()])
         if p == "/api/charters":
             return self.send(200, store.rows("SELECT charter, decision, note, created FROM charter_reviews r WHERE id=(SELECT MAX(id) FROM charter_reviews WHERE charter=r.charter)"))
+        if p == "/api/cost":
+            st = cost.status(store)
+            st["by_job"] = store.rows("SELECT job, ROUND(SUM(usd),4) AS usd FROM usage WHERE job IS NOT NULL GROUP BY job ORDER BY job DESC LIMIT 50")
+            return self.send(200, st)
         if p == "/api/charter-edits":
             return self.send(200, {e["charter"]: {**json.loads(e["patch"]), "applied": e["applied"], "cannot": e["cannot"], "created": e["created"]}
                                    for e in store.rows("SELECT * FROM charter_edits WHERE id IN (SELECT MAX(id) FROM charter_edits GROUP BY charter)")})
@@ -267,6 +272,27 @@ class H(BaseHTTPRequestHandler):
             store.event("answer", "Rafael answered a card", c["job"], c["firm"])
             runner.card_answered(int(m[1]))
             return self.send(200, {"ok": True})
+        if p == "/api/cost":
+            try:
+                if "cap" in b:
+                    v = float(b["cap"])
+                    if not 0 <= v <= 100000:
+                        raise ValueError
+                    cost.put(store, "cap_usd", v)
+                    cost.put(store, "extra_usd", 0)
+                if "extend" in b:
+                    v = float(b["extend"])
+                    if not 0 < v <= 100000:
+                        raise ValueError
+                    st = cost.status(store)
+                    cost.put(store, "extra_usd", st["extra"] + v)
+                    cost.put(store, "extra_month", st["month"])
+                if b.get("stop"):
+                    cost.put(store, "stop_epoch", int(cost.get(store, "stop_epoch", 0)) + 1)
+            except (TypeError, ValueError):
+                return self.send(400, {"error": "bad amount"})
+            store.event("cost", f"Cap now ${cost.status(store)['cap']:.0f}" + (" (stopped waiting runs)" if b.get("stop") else ""))
+            return self.send(200, cost.status(store))
         if p == "/api/charters/apply-changes":
             if not hasattr(runner, "client"):
                 return self.send(400, {"error": "needs the live Claude runner"})

@@ -574,4 +574,30 @@
   }, 4500);
 
   render();
+
+  /* COST BAR */
+  const CB = { d: null, open: false };
+  const usd = n => "$" + (n >= 100 ? n.toFixed(0) : n.toFixed(2));
+  function drawCost() {
+    const el = document.getElementById("costbar"), d = CB.d; if (!el || !d) return;
+    if (el.hidden) { el.hidden = false; document.documentElement.style.setProperty("--cb", "38px"); setTimeout(() => window.dispatchEvent(new Event("resize")), 50); }
+    const pct = d.cap > 0 ? Math.min(100, d.spent / d.cap * 100) : 100, cls = pct >= 100 ? "hot" : pct >= 80 ? "hot" : pct >= 60 ? "warn" : "";
+    el.classList.toggle("paused", !!d.paused); el.innerHTML = `<span class="cb-hide">Spend this month</span><b>${usd(d.spent)}</b><div class="cb-track" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100" aria-label="Spend against cap"><div class="cb-fill ${cls}" style="width:${pct}%"></div></div><span>of <b>${usd(d.cap)}</b></span>` +
+      (d.paused ? `<span class="cb-msg">Cap reached: runs paused</span><button class="cb-go" data-cbext="10">+ $10</button><button class="cb-go" data-cbext="25">+ $25</button><button data-cbstop="1">Stop runs</button>` : "") +
+      `<span class="cb-sp cb-hide">Today ${usd(d.today)}</span><button data-cbset="1">Set cap</button>`;
+    let pop = document.getElementById("cbpop");
+    if (CB.open && !pop) { pop = document.createElement("div"); pop.id = "cbpop"; pop.className = "cb-pop"; document.body.appendChild(pop); }
+    if (pop) { if (!CB.open) pop.remove(); else if (!pop.dataset.f) { pop.dataset.f = 1; pop.innerHTML = `<h4>Monthly spending cap</h4><small>Runs pause when it is reached. You can extend it or stop them. Resets each month.</small><label for="cbv">Cap in USD</label><input id="cbv" type="number" min="1" step="1" value="${Math.round(d.base)}"><label for="cbe">Or add extra this month</label><input id="cbe" type="number" min="1" step="1" placeholder="e.g. 10"><div class="row"><button class="pri" data-cbsave="1">Save</button><button data-cbclose="1">Close</button></div>`; } }
+  }
+  function pullCost() { fetch("/api/cost").then(r => r.ok ? r.json() : null).then(d => { if (d) { CB.d = d; drawCost(); } }).catch(() => {}); }
+  function postCost(body) { return fetch("/api/cost", { method: "POST", body: JSON.stringify(body) }).then(r => r.json()).then(d => { if (d.error) { toast("Could not save: " + d.error); return; } CB.d = d; drawCost(); }).catch(() => toast("Could not reach the server.")); }
+  document.addEventListener("click", e => {
+    const t = e.target.closest("[data-cbext],[data-cbstop],[data-cbset],[data-cbsave],[data-cbclose]"); if (!t) return;
+    if (t.dataset.cbext) postCost({ extend: +t.dataset.cbext }).then(() => toast("Cap extended. Work resumes."));
+    else if (t.dataset.cbstop) { if (confirm("Stop all paused runs? They end where they are.")) postCost({ stop: true }).then(() => toast("Paused runs stopped.")); }
+    else if (t.dataset.cbset) { CB.open = !CB.open; const p = document.getElementById("cbpop"); if (p) p.remove(); drawCost(); }
+    else if (t.dataset.cbsave) { const c = document.getElementById("cbv").value, x = document.getElementById("cbe").value; const go = x ? postCost({ extend: +x }) : postCost({ cap: +c }); go.then(() => { CB.open = false; drawCost(); toast("Cap saved."); }); }
+    else if (t.dataset.cbclose) { CB.open = false; drawCost(); }
+  });
+  pullCost(); setInterval(pullCost, 3000);
 })();

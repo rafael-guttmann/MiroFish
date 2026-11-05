@@ -137,6 +137,9 @@ def route_firm(text, requested):
     return "gtmn-cto"
 
 
+PUBLIC_STATIC = {"/manifest.webmanifest", "/sw.js", "/icon-192.png", "/icon-512.png", "/icon-maskable.png", "/apple-touch-icon.png"}
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -180,6 +183,8 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         p = urlparse(self.path).path
         if not p.startswith("/api/"):
+            if p in PUBLIC_STATIC:
+                return self.static(p)
             if not self.authed():
                 return self.login_page()
             return self.static(p)
@@ -502,7 +507,7 @@ class H(BaseHTTPRequestHandler):
         f = (UI / rel).resolve()
         if UI.resolve() not in f.parents and f != UI.resolve() or not f.is_file():
             return self.send(404, {"error": "not found"})
-        ct = {".html": "text/html", ".js": "text/javascript", ".css": "text/css"}.get(f.suffix, "application/octet-stream")
+        ct = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json"}.get(f.suffix, "application/octet-stream")
         self.send(200, f.read_bytes(), ct)
 
 

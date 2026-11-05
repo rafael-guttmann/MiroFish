@@ -25,7 +25,8 @@ def _frontmatter(path):
 def run(r, job_id):
     s, root = r.s, r.root
     j = s.one("SELECT * FROM jobs WHERE id=?", (job_id,))
-    title, firm = j["title"], "plenary"
+    title, firm = j["title"], j["firm"]
+    single = firm != "plenary"
     sem = threading.Semaphore(PARALLEL)
 
     def say(*a, **k):
@@ -44,21 +45,28 @@ def run(r, job_id):
     avail = {fid: c for fid, c in r.charters.items() if fid != "dani" and agents_dir(fid).is_dir() and approved(fid)}
     try:
         s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
-        s.event("start", "The Chair opened the Plenary", job_id, firm)
-        r._stage(job_id, firm, 0, 5, "Chair is deciding which firms must be in the room")
+        s.event("start", "The desk opened the mandate" if single else "The Chair opened the Plenary", job_id, firm)
+        r._stage(job_id, firm, 0, 5, "Desk is choosing which specialists to seat" if single else "Chair is deciding which firms must be in the room")
 
         # 1. Convene: the minimum set of firms, then seats per firm
-        ev = s.one("SELECT text FROM events WHERE job=? AND kind='picks'", (job_id,))
-        chosen = [f for f in (ev["text"].split(": ", 1)[1].split(", ") if ev else []) if f in avail]
-        if len(chosen) >= 2:
-            avail = {f: avail[f] for f in chosen}
-        menu = "\n".join(f"- {fid}: {c['name']} — owns {', '.join(c.get('owns', []))[:160]}. {c['summary'][:200]}" for fid, c in avail.items())
-        pick = _json(say("You are the Chair of the GTMN Plenary. You convene the minimum set of firms that covers every issue in the mandate, never fewer than two, never more than six (if Rafael already chose the firms, they are the only ones listed: convene them all, however many). You have no view on substance. Reply with JSON only.",
-                            f"Mandate: {title}\n\nFirms available:\n{menu}\n\nReturn {{\"firms\": [firm ids], \"lead\": firm id that holds the pen, \"why\": one sentence, \"issues\": [the 2-4 questions the mandate breaks into]}}", 900))
-        fids = chosen if len(chosen) >= 2 else [f for f in pick["firms"] if f in avail][:MAX_FIRMS]
-        if len(fids) < 2:
-            fids = [f for f in avail if f != "gtmn-cto"][:2] if len(fids) == 0 else fids + [next(f for f in avail if f not in fids)]
-        lead = pick.get("lead") if pick.get("lead") in fids else fids[0]
+        if single:
+            fids, lead = [firm], firm
+            avail = {firm: avail[firm]}
+            pick = _json(say("You are the desk of a GTMN firm. Break the mandate into the 2-4 questions the firm must answer. Reply with JSON only.",
+                             f"Firm: {avail[firm]['name']} — {avail[firm]['summary'][:300]}\n\nMandate: {title}\n\nReturn {{\"issues\": [the questions]}}", 500))
+            s.event("step", f"{avail[firm]['name']} desk opened: {len(pick.get('issues', []))} questions to answer", job_id, firm)
+        else:
+            ev = s.one("SELECT text FROM events WHERE job=? AND kind='picks'", (job_id,))
+            chosen = [f for f in (ev["text"].split(": ", 1)[1].split(", ") if ev else []) if f in avail]
+            if len(chosen) >= 2:
+                avail = {f: avail[f] for f in chosen}
+            menu = "\n".join(f"- {fid}: {c['name']} — owns {', '.join(c.get('owns', []))[:160]}. {c['summary'][:200]}" for fid, c in avail.items())
+            pick = _json(say("You are the Chair of the GTMN Plenary. You convene the minimum set of firms that covers every issue in the mandate, never fewer than two, never more than six (if Rafael already chose the firms, they are the only ones listed: convene them all, however many). You have no view on substance. Reply with JSON only.",
+                                f"Mandate: {title}\n\nFirms available:\n{menu}\n\nReturn {{\"firms\": [firm ids], \"lead\": firm id that holds the pen, \"why\": one sentence, \"issues\": [the 2-4 questions the mandate breaks into]}}", 900))
+            fids = chosen if len(chosen) >= 2 else [f for f in pick["firms"] if f in avail][:MAX_FIRMS]
+            if len(fids) < 2:
+                fids = [f for f in avail if f != "gtmn-cto"][:2] if len(fids) == 0 else fids + [next(f for f in avail if f not in fids)]
+            lead = pick.get("lead") if pick.get("lead") in fids else fids[0]
         s.event("step", f"Convened: {', '.join(avail[f]['name'] for f in fids)}. Lead: {avail[lead]['name']}. {pick.get('why', '')[:140]}", job_id, firm)
 
         seats = []
@@ -74,8 +82,8 @@ def run(r, job_id):
         ts = [threading.Thread(target=choose, args=(f,)) for f in fids]
         [t.start() for t in ts]
         [t.join() for t in ts]
-        if len({f for f, _, _ in seats}) < 2:
-            raise RuntimeError("could not seat two firms")
+        if len({f for f, _, _ in seats}) < (1 if single else 2):
+            raise RuntimeError("could not seat anyone")
         seats.sort(key=lambda x: fids.index(x[0]))
         s.event("step", "Seated: " + "; ".join(f"{n} ({avail[f]['name']})" for f, _, n in seats), job_id, firm)
 
@@ -190,15 +198,15 @@ def run(r, job_id):
         # 6. Decision memo, one pen (lead firm), dissent preserved; then independent verification
         steer = "\n".join(r.notes.get(job_id, []))
         rec = "\n".join(f"- {i['question']} → Rafael decided: {a}" for i, a in decisions) or "none needed"
-        memo = say(f"You hold the pen for the GTMN Plenary as {avail[lead]['name']}'s orchestrator, writing a decision memo to Rafael in a senior consulting partner's register. Structure: answer first; what the firms agreed; what Rafael decided; dissent preserved verbatim in each firm's own words, never averaged; remaining open items; next steps. Each section credits the firm. Markdown, under 1100 words.",
+        memo = say(f"You hold the pen for {'the ' + avail[lead]['name'] + ' desk' if single else 'the GTMN Plenary as ' + avail[lead]['name'] + chr(39) + 's orchestrator'}. House style: {avail[lead]['summary'][:350]}. Write a decision memo to Rafael in a senior consulting partner's register. Structure: answer first; what the firms agreed; what Rafael decided; dissent preserved verbatim in each firm's own words, never averaged; remaining open items; next steps. Each section credits the firm. Markdown, under 1100 words.",
                       f"Header rule: the memo starts with the line \"TO: Rafael\" exactly. Do not add a surname or title for him, and do not name any company other than GTMN Holdings and the firms listed.\n\nMandate: {title}\n\nFirms: {', '.join(avail[f]['name'] for f in fids)}\n\nPositions, verbatim:\n{v1}\n\nCross-examination:\n{v2}\n\nIssue status: {json.dumps(st)}\n\nRafael's decisions:\n{rec}\n\nStill open, not asked: {json.dumps(left)}\n\nRafael's steering notes (apply them): {steer or 'none'}", 3000)
         ver, verdict = r._verify(job_id, firm, memo, sources)
         (vault / "facts.md").write_text(f"# Fact ledger\n\n- {facts}\n" + "".join(f"- Rafael decided on {i['id']}: {a}\n" for i, a in decisions))
         (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Verification ({verdict})\n\n{ver}\n\n## Sources consulted\n\n" + "\n".join(f"- {v}: {k}" for k, v in sources.items()) + f"\n\n---\n## Plenary file\n\n### Blind positions\n\n{v1}\n\n### Cross-examination\n\n{v2}\n")
         fmts = j["formats"]
         s.run("UPDATE jobs SET status='done', progress=1, stage=4 WHERE id=?", (job_id,))
-        r._deliver(job_id, firm, title, memo, verdict, "plenary-chair", json.loads(fmts))
-        s.event("done", f"Plenary closed with {len(seats)} seats from {len(fids)} firms. Memo is in the Library.", job_id, firm)
+        r._deliver(job_id, firm, title, memo, verdict, firm + "-desk", json.loads(fmts))
+        s.event("done", f"{'Firm' if single else 'Plenary'} closed with {len(seats)} seats from {len(fids)} firm{'' if single else 's'}. Memo is in the Library.", job_id, firm)
     except Exception as e:
         s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
         s.event("error", f"Plenary stopped: {type(e).__name__}: {str(e)[:160]}", job_id, firm)

@@ -108,12 +108,12 @@ class AgentSDKRunner(Runner):
 
     def _real(self, job_id):
         j = self.s.one("SELECT firm FROM jobs WHERE id=?", (job_id,))
-        return j and j["firm"] in self.REAL
+        return bool(j) and (j["firm"] in self.REAL or (j["firm"] in self.charters and j["firm"] != "dani" and (self.root / "firms" / j["firm"] / "agents").is_dir()))
 
     def start(self, job_id):
         if self._real(job_id):
             j = self.s.one("SELECT firm FROM jobs WHERE id=?", (job_id,))
-            if j["firm"] == "plenary":
+            if j["firm"] != "gtmn-cto":
                 import plenary
                 threading.Thread(target=plenary.run, args=(self, job_id), daemon=True).start()
             else:

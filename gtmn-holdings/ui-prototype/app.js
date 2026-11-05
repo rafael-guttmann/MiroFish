@@ -9,7 +9,7 @@
   const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   let live = false, sig = "";
-  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), convened: ["gtmn-cto", "dani", "spc-deal-team"] };
+  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), granola: true, convened: ["gtmn-cto", "dani", "spc-deal-team"] };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
   const firmAgents = f => f.agents.map(a => ({ ...a, st: S.state[f.id + "/" + a.id] }));
@@ -324,6 +324,7 @@
       <textarea class="big" id="demand" placeholder="For example: Should we acquire a Brazilian payments company at a 6x revenue multiple?"></textarea>
       <div class="drop">Drop files here or <label style="text-decoration:underline;cursor:pointer">choose files<input type="file" multiple hidden></label></div>
       <h2 style="margin-top:20px">Deliverable format</h2><div class="routes"><button class="chip" data-nfmt="" aria-pressed="${!S.newFmts.size}">Ask me when it's ready</button>${Object.keys(FMT).map(k => `<button class="chip" data-nfmt="${k}" aria-pressed="${S.newFmts.has(k)}">${k}</button>`).join("")}</div>
+      <h2 style="margin-top:20px">Your meeting notes</h2><div class="routes"><button class="chip" data-gr="1" aria-pressed="${S.granola}">Agents may search my Granola meetings</button><button class="chip" data-gr="0" aria-pressed="${!S.granola}">Keep meetings out of this one</button></div>
       <h2 style="margin-top:20px">Design system</h2><div class="routes"><button class="chip" data-nds="" aria-pressed="${S.nds === null}">Ask me when design starts</button><button class="chip" data-nds="skill" aria-pressed="${S.nds === "skill"}">Let the design skill decide</button>${stds.map(s => `<button class="chip" data-nds="${s.id}" aria-pressed="${S.nds === s.id}">${esc(s.name)}</button>`).join("")}</div>
       <h2 style="margin-top:20px">Send to <small style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.7">· tap one firm, or as many as you want to convene them in a Plenary</small></h2>
       <div class="routes"><button class="chip" data-route="" aria-pressed="${S.route === null}">Let the front desk choose</button><button class="chip" data-route="plenary" aria-pressed="${S.route === "plenary"}">Several firms (Plenary)</button>${FIRMS.map(f => `<button class="chip" style="--a:${f.accent}" data-route="${f.id}" aria-pressed="${S.picks.has(f.id)}"><i></i>${esc(f.name)}</button>`).join("")}</div>
@@ -410,6 +411,7 @@
   function wireNewSubmit() {
     const d = $("#demand"), s = $("#submit");
     d.oninput = () => s.disabled = !d.value.trim();
+    document.querySelectorAll("[data-gr]").forEach(b => b.onclick = () => { const keep = d.value; S.granola = b.dataset.gr === "1"; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     document.querySelectorAll("[data-nds]").forEach(b => b.onclick = () => { const v = b.dataset.nds, keep = d.value; S.nds = v === "" ? null : v; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     document.querySelectorAll("[data-nfmt]").forEach(b => b.onclick = () => { const v = b.dataset.nfmt, keep = d.value; v ? (S.newFmts.has(v) ? S.newFmts.delete(v) : S.newFmts.add(v)) : S.newFmts.clear(); render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
     document.querySelectorAll("[data-route]").forEach(b => b.onclick = () => { const v = b.dataset.route, keep = d.value;
@@ -418,7 +420,7 @@
     s.onclick = () => {
       const t = d.value.trim(); if (!t) return;
       if (live) {
-        post("/api/jobs", { title: t, firm: S.route || undefined, firms: S.picks.size > 1 ? [...S.picks] : undefined, formats: [...S.newFmts], design: S.nds }).then(async r => {
+        post("/api/jobs", { title: t, firm: S.route || undefined, firms: S.picks.size > 1 ? [...S.picks] : undefined, formats: [...S.newFmts], design: S.nds, granola: S.granola }).then(async r => {
           const j = await r.json();
           if (r.status === 409) { toast(`${j.name}'s charter isn't approved yet. Approve it in Charters first.`); return; }
           if (!r.ok) { toast("The server refused this demand."); return; }

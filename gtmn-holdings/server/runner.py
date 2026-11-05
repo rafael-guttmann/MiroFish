@@ -234,11 +234,12 @@ class AgentSDKRunner(Runner):
 
     def _say(self, system, user, max_tokens=1800, tools=False, sources=None, job_id=None, who="", deep=False):
         msgs = [{"role": "user", "content": user}]
-        if tools and not deep and granola.enabled():
+        use_g = bool(tools and not deep and granola.enabled() and (not job_id or (self.s.one("SELECT granola FROM jobs WHERE id=?", (job_id,)) or {}).get("granola", 1)))
+        if use_g:
             system += ("\nYou can search Rafael's own meeting notes with meeting_search and meeting_read. Use them once or twice for prior decisions, "
                        "commitments or counterparties that bear on the mandate; quote only what you read, and never send meeting content into web searches.")
         for _ in range(10 if deep else 6):
-            kw = {"tools": (self.DEEP_TOOLS if deep else self.TOOLS) + (granola.TOOLS if granola.enabled() and not deep else [])} if tools else {}
+            kw = {"tools": (self.DEEP_TOOLS if deep else self.TOOLS) + (granola.TOOLS if use_g else [])} if tools else {}
             r = self.client.beta.messages.create(model=self.model, max_tokens=max_tokens, system=system,
                                                  messages=msgs, betas=["web-fetch-2025-09-10", "code-execution-2025-05-22"], **kw)
             for b in r.content:

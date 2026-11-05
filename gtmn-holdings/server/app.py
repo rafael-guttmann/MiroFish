@@ -161,8 +161,8 @@ class H(BaseHTTPRequestHandler):
                 for f in picks:
                     if not approved(f):
                         return self.send(409, {"error": "charter not approved", "firm": f, "name": charters[f]["name"]})
-            jid = store.run("INSERT INTO jobs(title,firm,formats,design,created) VALUES(?,?,?,?,?)",
-                            (title, firm, json.dumps(fmts), b.get("design"), time.time()))
+            jid = store.run("INSERT INTO jobs(title,firm,formats,design,created,granola) VALUES(?,?,?,?,?,?)",
+                            (title, firm, json.dumps(fmts), b.get("design"), time.time(), 0 if b.get("granola") is False else 1))
             if picks:
                 store.event("picks", "Rafael chose the firms: " + ", ".join(picks), jid, firm)
             store.event("routed", f"Front desk routed the demand to {firm}", jid, firm)

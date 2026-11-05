@@ -43,6 +43,10 @@ class Store:
                     self.db.execute(f"ALTER TABLE docs ADD COLUMN {col}")
                 except sqlite3.OperationalError:
                     pass
+            try:
+                self.db.execute("ALTER TABLE jobs ADD COLUMN granola INTEGER NOT NULL DEFAULT 1")
+            except sqlite3.OperationalError:
+                pass
             self.db.commit()
 
     def run(self, sql, args=()):

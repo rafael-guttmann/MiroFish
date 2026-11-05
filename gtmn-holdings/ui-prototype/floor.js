@@ -446,8 +446,8 @@
     }
     function resize() {
       const avail = wrap.clientWidth - 8;
-      const byW = avail >= 640 ? Math.floor(avail / W) : avail / W, byH = (window.innerHeight - (wrap.getBoundingClientRect().top + window.scrollY) - 14) / H;
-      scale = Math.max(1.2, Math.min(byW, byH));
+      const byW = avail >= 640 ? Math.floor(avail / W) : avail / W, byH = ((() => { const m = wrap.closest('main'); const mr = m ? m.getBoundingClientRect() : { top: 0, height: window.innerHeight }; return mr.height - (wrap.getBoundingClientRect().top - mr.top + (m ? m.scrollTop : 0)) - 20 - (roster.offsetHeight + (host.querySelector('.fl-legend') || {}).offsetHeight + 24); })()) / H;
+      scale = Math.max(1.6, Math.min(byW, byH));
       cv.style.width = W * scale + "px"; cv.style.height = H * scale + "px"; stage.style.width = W * scale + "px"; stage.style.height = H * scale + "px";
       wrap.style.height = "auto";
       requestAnimationFrame(() => { wrap.scrollLeft = Math.max(0, (W * scale + 8 - wrap.clientWidth) / 2); });

@@ -5,6 +5,7 @@ a question card, and honours steering notes. AgentSDKRunner is the real one and 
 stub until the CTO firm is wired to the Claude Agent SDK.
 """
 import json
+from pathlib import Path
 import os
 import granola
 import threading
@@ -178,7 +179,7 @@ class AgentSDKRunner(Runner):
         """The desk decides which deliverables this mandate needs and the best format for each.
         The decision memo is always first; extra reports are written from the verified memo."""
         s = self.s
-        vault = self.root / "server" / "data" / "vault" / f"job-{job_id}"
+        vault = Path(os.environ.get("HOLDINGS_DATA") or self.root / "server" / "data") / "vault" / f"job-{job_id}"
         plan = []
         try:
             raw = self._say("You are the delivery desk. Decide which deliverables this mandate needs and the best format for each. "
@@ -313,7 +314,7 @@ class AgentSDKRunner(Runner):
             memo = self._say("You are the orchestrating desk of the Office of the CTO at GTMN Holdings. Write a decision memo in a senior consulting partner's register: answer first, then reasoning, preserved dissent, risks, next steps. Markdown, under 900 words.",
                              f"Mandate: {title}\n\nBlind positions:\n{positions}\n\nRafael's decision: {answer}\n\nRafael's steering notes (apply them): {steer or 'none'}", 2600)
             ver, verdict = self._verify(job_id, firm, memo, sources, 3, 4)
-            vault = self.root / "server" / "data" / "vault" / f"job-{job_id}"
+            vault = Path(os.environ.get("HOLDINGS_DATA") or self.root / "server" / "data") / "vault" / f"job-{job_id}"
             vault.mkdir(parents=True, exist_ok=True)
             (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Blind positions\n\n{positions}\n\n---\n## Verification ({verdict})\n\n{ver}\n\n## Sources consulted\n\n" + "\n".join(f"- {v}: {k}" for k, v in sources.items()) + "\n")
             fmts = j["formats"]

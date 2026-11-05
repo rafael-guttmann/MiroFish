@@ -4,6 +4,7 @@ list, one cross-examination turn, Rafael decides what stays open, a verified dec
 The Chair never takes a view on substance; firm text is filed verbatim."""
 import granola
 import json
+from pathlib import Path
 import re
 import threading
 import time
@@ -33,7 +34,7 @@ def run(r, job_id):
     def say(*a, **k):
         with sem:
             return r._say(*a, **k)
-    vault = root / "server" / "data" / "vault" / f"job-{job_id}"
+    vault = Path(os.environ.get("HOLDINGS_DATA") or root / "server" / "data") / "vault" / f"job-{job_id}"
     (vault / "envelopes").mkdir(parents=True, exist_ok=True)
 
     def approved(fid):

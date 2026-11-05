@@ -10,7 +10,8 @@ import re
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+import hmac
+from urllib.parse import quote, unquote, urlparse
 
 from runner import AgentSDKRunner, SimulatedRunner
 import backup
@@ -37,11 +38,12 @@ for f in (ROOT / "charters").glob("*.json"):
         c = json.loads(f.read_text())
         charters[c["id"]] = c
 
-store = Store(HERE / "data" / "holdings.db")
+DATA = Path(os.environ.get("HOLDINGS_DATA") or HERE / "data")
+DATA.mkdir(parents=True, exist_ok=True)
+store = Store(DATA / "holdings.db")
 runner = AgentSDKRunner(store, charters, ROOT) if os.environ.get("HOLDINGS_RUNNER") == "sdk" else SimulatedRunner(store, charters)
 
 
-DATA = HERE / "data"
 BACKUP_DIRS = [os.environ.get("HOLDINGS_BACKUP_DIR") or str(DATA / "backups")] + ([os.environ["HOLDINGS_BACKUP_DIR2"]] if os.environ.get("HOLDINGS_BACKUP_DIR2") else [])
 last_backup = {}
 
@@ -88,7 +90,22 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def authed(self):
-        return not TOKEN or self.headers.get("Authorization") == f"Bearer {TOKEN}"
+        if not TOKEN:
+            return True
+        got = self.headers.get("Authorization", "")
+        if got.startswith("Bearer ") and hmac.compare_digest(got[7:], TOKEN):
+            return True
+        m = re.search(r"(?:^|;\s*)holdings_token=([^;]+)", self.headers.get("Cookie", ""))
+        return bool(m) and hmac.compare_digest(unquote(m.group(1)), TOKEN)
+
+    def login_page(self, err=""):
+        html = ("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>GTMN Holdings</title>"
+                "<body style='font:16px system-ui;background:#f5f2ec;display:grid;place-items:center;height:100vh;margin:0'>"
+                "<form method=post action=/login style='background:#fff;padding:32px;border-radius:12px;width:min(340px,90vw);box-shadow:0 2px 12px #0002'>"
+                "<h2 style='margin:0 0 4px'>GTMN Holdings</h2><p style='margin:0 0 16px;color:#666'>Enter your access key.</p>"
+                "<input type=password name=token autofocus required style='width:100%;padding:10px;box-sizing:border-box;border:1px solid #bbb;border-radius:8px'>"
+                f"<p style='color:#b00;min-height:1.2em'>{err}</p><button style='width:100%;padding:10px;border:0;border-radius:8px;background:#1a1a1a;color:#fff'>Open</button></form>")
+        self.send(200, html.encode(), "text/html; charset=utf-8")
 
     def body(self):
         n = int(self.headers.get("Content-Length") or 0)
@@ -99,6 +116,8 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         p = urlparse(self.path).path
         if not p.startswith("/api/"):
+            if not self.authed():
+                return self.login_page()
             return self.static(p)
         if not self.authed():
             return self.send(401, {"error": "unauthorized"})
@@ -140,6 +159,18 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         p = urlparse(self.path).path
+        if p == "/login":
+            raw = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 2000)).decode()
+            tok = parse_qs(raw).get("token", [""])[0]
+            if TOKEN and hmac.compare_digest(tok, TOKEN):
+                secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
+                self.send_response(303)
+                self.send_header("Set-Cookie", f"holdings_token={quote(tok)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000{secure}")
+                self.send_header("Location", "/")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            return self.login_page("That key is not right.")
         if not self.authed():
             return self.send(401, {"error": "unauthorized"})
         try:
@@ -232,7 +263,7 @@ class H(BaseHTTPRequestHandler):
         d = store.one("SELECT * FROM docs WHERE id=?", (did,))
         fmt = (q.get("format") or ["PDF"])[0]
         if d and fmt in ("text", "Markdown"):
-            f = HERE / "data" / "vault" / f"job-{d['job']}" / (d.get("src") or "decision-memo.md")
+            f = DATA / "vault" / f"job-{d['job']}" / (d.get("src") or "decision-memo.md")
             if not f.is_file():
                 return self.send(404, {"error": "no source"})
             if fmt == "text":
@@ -248,7 +279,7 @@ class H(BaseHTTPRequestHandler):
             return self.wfile.write(body)
         if not d or fmt not in render.BUILD:
             return self.send(404, {"error": "not found"})
-        vault = HERE / "data" / "vault" / f"job-{d['job']}"
+        vault = DATA / "vault" / f"job-{d['job']}"
         src = vault / (d.get("src") or "decision-memo.md")
         if not src.is_file():
             return self.send(404, {"error": "no source file for this deliverable yet"})
@@ -280,7 +311,9 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    host, port = os.environ.get("HOLDINGS_HOST", "127.0.0.1"), int(os.environ.get("HOLDINGS_PORT", "8841"))
+    host, port = os.environ.get("HOLDINGS_HOST", "127.0.0.1"), int(os.environ.get("PORT") or os.environ.get("HOLDINGS_PORT", "8841"))
+    if host not in ("127.0.0.1", "localhost") and not TOKEN:
+        raise SystemExit("Refusing to listen on a public address without HOLDINGS_TOKEN.")
     print(f"Holdings server on http://{host}:{port}  runner={type(runner).__name__}  firms={len(charters)}")
     backup.schedule(lambda: do_backup("nightly"), int(os.environ.get("HOLDINGS_BACKUP_HOUR", "2")))
     ThreadingHTTPServer((host, port), H).serve_forever()

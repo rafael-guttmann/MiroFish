@@ -188,7 +188,7 @@ def to_jpeg(title, md):
     d = ImageDraw.Draw(im)
 
     def font(sz):
-        for f in ("/System/Library/Fonts/Supplemental/Times New Roman.ttf", "/System/Library/Fonts/Times.ttc"):
+        for f in ("/System/Library/Fonts/Supplemental/Times New Roman.ttf", "/System/Library/Fonts/Times.ttc", "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf"):
             try:
                 return ImageFont.truetype(f, sz)
             except Exception:

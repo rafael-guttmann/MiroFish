@@ -230,6 +230,20 @@ class AgentSDKRunner(Runner):
         self.s.event("verify", f"Verification result: {verdict}", job_id, firm)
         return ver, verdict
 
+    def _verify_fix(self, job_id, firm, memo, sources, stage=4, of=5):
+        """Verify; if any claim is contradicted, correct the memo once from the verifier's findings and verify again."""
+        ver, verdict = self._verify(job_id, firm, memo, sources, stage, of)
+        if verdict != "FAIL":
+            return memo, ver, verdict
+        self.s.event("step", "Verifier found errors; the desk is correcting the memo once and re-checking", job_id, firm)
+        fixed = self._say("You correct a decision memo after a fact-check. For every CONTRADICTED claim, replace it with the figure or rule the verifier found in a source it read. For every UNVERIFIED claim, keep it only if marked 'to be confirmed by counsel'. "
+                          "Fix anything else that depended on a corrected figure. Change nothing else, keep the structure and the \"TO: Rafael\" header, and return the full corrected memo in Markdown only.",
+                          f"Memo:\n\n{memo}\n\nVerifier findings:\n\n{ver}", 6000, False, None, job_id, "Desk")
+        if len(fixed) < len(memo) * 0.5:
+            return memo, ver, verdict
+        ver2, verdict2 = self._verify(job_id, firm, fixed, sources, stage, of)
+        return fixed, ver2, verdict2
+
     DOC_FORMATS = ("Word", "PDF", "Excel", "PowerPoint", "JPEG", "Markdown")
 
     def _deliver(self, job_id, firm, title, memo, verdict, by, requested):
@@ -411,7 +425,7 @@ class AgentSDKRunner(Runner):
             steer = "\n".join(self.notes.get(job_id, []))
             memo = self._say("You are the orchestrating desk of the Office of the CTO at GTMN Holdings. Write a decision memo in a senior consulting partner's register: answer first, then reasoning, preserved dissent, risks, next steps. Markdown, under 900 words.",
                              f"Mandate: {title}\n\nBlind positions:\n{positions}\n\nRafael's decision: {answer}\n\nRafael's steering notes (apply them): {steer or 'none'}", 2600)
-            ver, verdict = self._verify(job_id, firm, memo, sources, 3, 4)
+            memo, ver, verdict = self._verify_fix(job_id, firm, memo, sources, 3, 4)
             vault = Path(os.environ.get("HOLDINGS_DATA") or self.root / "server" / "data") / "vault" / f"job-{job_id}"
             vault.mkdir(parents=True, exist_ok=True)
             (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Blind positions\n\n{positions}\n\n---\n## Verification ({verdict})\n\n{ver}\n\n## Sources consulted\n\n" + "\n".join(f"- {v}: {k}" for k, v in sources.items()) + "\n")

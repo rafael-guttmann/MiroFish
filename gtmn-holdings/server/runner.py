@@ -6,6 +6,7 @@ stub until the CTO firm is wired to the Claude Agent SDK.
 """
 import json
 import re
+import sys
 from pathlib import Path
 import os
 import cost
@@ -371,7 +372,7 @@ class AgentSDKRunner(Runner):
                 passages = "(search failed; say so and answer as a take)"
             s.event("step", "Dani searched his corpus", job_id, firm)
             self._stage(job_id, firm, 1, 3, "Dani is writing his take")
-            memo = self._say(persona + "\n\n" + ref[:14000] + "\n\nGround the answer in the passages below. Quote only words that appear verbatim; keep credits to others; say plainly when something is your take rather than on the record. Use web_search for outside facts; mark anything unverified. Write in Markdown, answer first, under 700 words; refer to Daniel in the third person. Lines marked as previous speaker are not his words. Start directly with the answer: no preamble, no meta-commentary about passages or frameworks."
+            memo = self._say(persona + "\n\n" + ref[:14000] + "\n\nGround the answer in the passages below. Quote only words that appear verbatim; keep credits to others; say plainly when something is your take rather than on the record. Use web_search for outside facts; mark anything unverified. Write in Markdown, answer first, under 700 words; refer to Daniel in the third person. Lines marked as previous speaker are not his words. Start directly with the answer: no preamble, no meta-commentary about passages or frameworks.",
                              f"Mandate: {title}\n\nSteering notes: {' '.join(self.notes.get(job_id, [])) or 'none'}\n\nPassages from his public words:\n{passages}", 2400, True, {}, job_id, "Dani")
             vault = Path(os.environ.get("HOLDINGS_DATA") or self.root / "server" / "data") / "vault" / f"job-{job_id}"
             vault.mkdir(parents=True, exist_ok=True)
@@ -380,9 +381,9 @@ class AgentSDKRunner(Runner):
             self._deliver(job_id, firm, title, memo, "advisory, not verified", "dani", json.loads(j["formats"]))
             s.run("UPDATE jobs SET status='done', progress=1, stage=2 WHERE id=?", (job_id,))
             s.event("done", "Dani's take is in the Library.", job_id, firm)
-        except cost.CapStop:
+        except cost.CapStop as e:
             s.run("UPDATE jobs SET status='waiting' WHERE id=? AND status!='stopped'", (job_id,))
-            s.event("error", "Stopped at your spend cap.", job_id, firm)
+            s.event("error", "Stopped at your spend cap." if type(e).__name__ == "CapStop" else "Stopped by you.", job_id, firm)
         except Exception as e:
             s.run("UPDATE jobs SET status='waiting' WHERE id=? AND status!='stopped'", (job_id,))
             s.event("error", f"Run stopped: {type(e).__name__}: {str(e)[:160]}", job_id, firm)

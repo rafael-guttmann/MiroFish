@@ -445,7 +445,9 @@
       bar.innerHTML = chip("plenary", "Boardroom", api.convened().length, "#16181D") + offices.map(f => chip(f.id, f.name, f.agents.filter(a => api.state(a.fid, a.id) !== "idle").length, f.accent)).join("");
     }
     function resize() {
-      const avail = wrap.clientWidth - 8; scale = avail >= 640 ? Math.floor(avail / W) : avail / W;
+      const avail = wrap.clientWidth - 8;
+      const byW = avail >= 640 ? Math.floor(avail / W) : avail / W, byH = (window.innerHeight - (wrap.getBoundingClientRect().top + window.scrollY) - 14) / H;
+      scale = Math.max(1.2, Math.min(byW, byH));
       cv.style.width = W * scale + "px"; cv.style.height = H * scale + "px"; stage.style.width = W * scale + "px"; stage.style.height = H * scale + "px";
       wrap.style.height = "auto";
       requestAnimationFrame(() => { wrap.scrollLeft = Math.max(0, (W * scale + 8 - wrap.clientWidth) / 2); });
@@ -488,7 +490,7 @@
 
     rooms.plenary = makeBoard(); offices.forEach(f => rooms[f.id] = makeFirmRoom(f));
     if (!rooms[room]) room = "plenary";
-    drawBar(); resize(); raf = requestAnimationFrame(frame);
+    drawBar(); resize(); window.scrollTo(0, 0); raf = requestAnimationFrame(frame);
   }
   window.Floor = { mount };
 })();

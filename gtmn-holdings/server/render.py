@@ -123,34 +123,68 @@ def to_docx(title, md):
     return buf.getvalue()
 
 
+_NUM = re.compile(r"^([-+]?)\s*(US\$|R\$|\$|€)?\s*(\d[\d,]*(?:\.\d+)?)\s*(%|x|×)?$")
+
+
+def _cell(c):
+    """Numbers become real numbers, '=...' becomes a formula, everything else stays text."""
+    raw = str(c).strip().strip("`")
+    if raw.startswith("=") and len(raw) > 1:
+        return raw, None
+    v = plain(c).strip()
+    m = _NUM.match(v)
+    if m:
+        n = float(m[3].replace(",", ""))
+        n = -n if m[1] == "-" else n
+        if m[4] == "%":
+            return n / 100, "0.0%"
+        return (int(n) if n == int(n) else n), ("#,##0.00" if m[4] in ("x", "×") or "." in m[3] else "#,##0")
+    return v, None
+
+
 def to_xlsx(title, md):
     import openpyxl
     from openpyxl.styles import Alignment, Font, PatternFill
     wb = openpyxl.Workbook()
-    ws, k = wb.active, 0
+    ws = wb.active
     ws.title = "Summary"
     ws.append([title])
     ws["A1"].font = Font(bold=True, size=14)
     ws.append([])
-    sheets = []
+    names, last, tables = {"summary"}, "", 0
     for b in parse(md):
         if b[0] == "table":
-            k += 1
-            s = wb.create_sheet(f"Table {k}")
+            tables += 1
+            base = re.sub(r"[\[\]:*?/\\]", " ", plain(last))[:28].strip() or f"Table {tables}"
+            nm, k = base, 2
+            while nm.lower() in names:
+                nm = f"{base[:26]} {k}"
+                k += 1
+            names.add(nm.lower())
+            s = wb.create_sheet(nm)
             for r in b[1]:
-                s.append([plain(c) for c in r])
+                s.append([_cell(c)[0] for c in r])
+            for ri, r in enumerate(b[1], 1):
+                if ri > 1:
+                    for ci, c in enumerate(r, 1):
+                        fmt = _cell(c)[1]
+                        if fmt:
+                            s.cell(ri, ci).number_format = fmt
             for c in s[1]:
                 c.font, c.fill = Font(bold=True), PatternFill("solid", fgColor="E6E6E6")
+            s.freeze_panes = "A2"
             for col in s.columns:
                 s.column_dimensions[col[0].column_letter].width = min(60, max(12, max(len(str(c.value or "")) for c in col) * 0.9))
                 for c in col:
                     c.alignment = Alignment(wrap_text=True, vertical="top")
-            sheets.append(s)
-        elif b[0] == "h" and b[1] <= 2:
-            ws.append([plain(b[2])])
-            ws.cell(ws.max_row, 1).font = Font(bold=True)
+            ws.append([f"Sheet: {nm}"])
+        elif b[0] == "h" and b[1] <= 3:
+            last = b[2]
+            if b[1] <= 2:
+                ws.append([plain(b[2])])
+                ws.cell(ws.max_row, 1).font = Font(bold=True)
     ws.column_dimensions["A"].width = 90
-    if not sheets:
+    if not tables:
         ws.append(["No tables in this deliverable."])
     buf = io.BytesIO()
     wb.save(buf)

@@ -165,6 +165,18 @@ class H(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/jobs/(\d+)/thread", p)
         if m:
             return self.send(200, store.rows("SELECT role, text, created FROM messages WHERE job=? ORDER BY id", (m[1],)))
+        if p == "/api/backup.zip":
+            do_backup("download")
+            f = Path(BACKUP_DIRS[0]) / last_backup["name"]
+            body = f.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Disposition", f'attachment; filename="{f.name}"')
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if p == "/api/docs.zip":
             return self.zipfile(parse_qs(urlparse(self.path).query))
         if p == "/api/cost":

@@ -275,7 +275,7 @@ class AgentSDKRunner(Runner):
 
         def write(i, p):
             out[i] = self._say("You write one deliverable for GTMN Holdings from a verified decision memo. Use only facts in the memo; do not add new facts. "
-                               "Markdown. Put numbers in markdown tables so they can become a spreadsheet; use '## ' headings, one per slide, if it is a deck. Under 900 words.",
+                               "Markdown. Put numbers in markdown tables so they can become a spreadsheet; use '## ' headings, one per slide, if it is a deck. If it is a model or calculator, give each table a '### ' heading naming the sheet, put inputs in a labelled Inputs table with plain numbers (no units inside the cell; put units in the header), and write calculated cells as spreadsheet formulas such as =B2*C2 that refer to those cells, so the workbook recalculates. Do not invent input values the memo does not state: leave them as 0 and mark them 'to be provided'. Under 900 words.",
                                f"Deliverable: {p['name']} ({p.get('kind', '')})\nMust contain: {p.get('brief', '')}\n\nVerified memo:\n{memo}", 2600)
         ts = [threading.Thread(target=write, args=(i, p)) for i, p in enumerate(extras)]
         [t.start() for t in ts]

@@ -151,7 +151,7 @@ class H(BaseHTTPRequestHandler):
             if not title:
                 return self.send(400, {"error": "title required"})
             fmts = [f for f in b.get("formats", []) if f in FORMATS]
-            firm = route_firm(title, b.get("firm"))
+            firm = "plenary" if len([f for f in b.get("firms", []) if f in charters]) > 1 else route_firm(title, b.get("firm"))
             if firm in charters and not approved(firm):
                 return self.send(409, {"error": "charter not approved", "firm": firm, "name": charters[firm]["name"]})
             picks = [f for f in b.get("firms", []) if f in charters] if firm == "plenary" else []

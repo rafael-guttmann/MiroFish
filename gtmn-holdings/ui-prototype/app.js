@@ -9,7 +9,7 @@
   const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   let live = false, sig = "";
-  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", wmode: false, wsel: new Set(), arch: false, open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), granola: true, convened: ["gtmn-cto", "dani", "spc-deal-team"] };
+  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", wmode: false, wsel: new Set(), arch: false, open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), granola: true, convened: [] };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
   const firmAgents = f => f.agents.map(a => ({ ...a, st: S.state[f.id + "/" + a.id] }));
@@ -576,6 +576,7 @@
     try { [js, cs, lb] = await Promise.all([getj("/api/jobs"), getj("/api/cards"), getj("/api/library")]); } catch (e) { return; }
     const docOf = job => (lb.docs.find(d => d.job === job) || {}).id;
     const mapJ = j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, live: 1 });
+    S.convened = [...new Set(js.filter(j => !j.archived).flatMap(j => j.convened || []))].filter(id => byId[id]);
     jobs = js.filter(j => !j.archived).map(mapJ); ajobs = js.filter(j => j.archived).map(mapJ);
     cards = cs.map(c => { const p = c.payload, f = byId[c.firm]; return { id: "c" + c.id, srv: c.id, job: c.job, firm: c.firm, agent: f ? f.agents[0].name : "Plenary Chair", kind: p.kind, q: p.q, opts: p.opts, why: p.why, def: p.def, fmtDoc: p.q.startsWith("Which formats") ? "d" + docOf(c.job) : undefined }; });
     docs = lb.docs.map(d => ({ id: "d" + d.id, job: d.job, name: d.name, type: d.kind, why: d.why || "Produced for this demand.", by: agName(d.by), ver: d.version, fmts: JSON.parse(d.formats || "[]"), st: "final", at: when(d.created) }));

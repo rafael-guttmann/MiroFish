@@ -215,7 +215,11 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, {e["charter"]: {**json.loads(e["patch"]), "applied": e["applied"], "cannot": e["cannot"], "created": e["created"]}
                                    for e in store.rows("SELECT * FROM charter_edits WHERE id IN (SELECT MAX(id) FROM charter_edits GROUP BY charter)")})
         if p == "/api/jobs":
-            return self.send(200, store.rows("SELECT * FROM jobs ORDER BY id DESC"))
+            js = store.rows("SELECT * FROM jobs ORDER BY id DESC")
+            for j in js:
+                ev = store.one("SELECT text FROM events WHERE job=? AND kind='convened' ORDER BY id DESC", (j["id"],)) if j["firm"] == "plenary" else None
+                j["convened"] = ev["text"].split(",") if ev and j["status"] in ("working", "asking") else []
+            return self.send(200, js)
         m = re.fullmatch(r"/api/jobs/(\d+)", p)
         if m:
             j = store.one("SELECT * FROM jobs WHERE id=?", (m[1],))

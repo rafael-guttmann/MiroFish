@@ -70,6 +70,7 @@ def run(r, job_id):
             if len(fids) < 2:
                 fids = [f for f in avail if f != "gtmn-cto"][:2] if len(fids) == 0 else fids + [next(f for f in avail if f not in fids)]
             lead = pick.get("lead") if pick.get("lead") in fids else fids[0]
+        s.event("convened", ",".join(fids), job_id, firm)
         s.event("step", f"Convened: {', '.join(avail[f]['name'] for f in fids)}. Lead: {avail[lead]['name']}. {pick.get('why', '')[:140]}", job_id, firm)
 
         seats = []

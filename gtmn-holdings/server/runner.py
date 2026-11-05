@@ -114,12 +114,14 @@ class AgentSDKRunner(Runner):
 
     def _real(self, job_id):
         j = self.s.one("SELECT firm FROM jobs WHERE id=?", (job_id,))
-        return bool(j) and (j["firm"] in self.REAL or (j["firm"] in self.charters and j["firm"] != "dani" and (self.root / "firms" / j["firm"] / "agents").is_dir()))
+        return bool(j) and (j["firm"] in self.REAL or (j["firm"] == "dani" or j["firm"] in self.charters and (self.root / "firms" / j["firm"] / "agents").is_dir()))
 
     def start(self, job_id):
         if self._real(job_id):
             j = self.s.one("SELECT firm FROM jobs WHERE id=?", (job_id,))
-            if j["firm"] != "gtmn-cto":
+            if j["firm"] == "dani":
+                threading.Thread(target=self._run_dani, args=(job_id,), daemon=True).start()
+            elif j["firm"] != "gtmn-cto":
                 import plenary
                 threading.Thread(target=plenary.run, args=(self, job_id), daemon=True).start()
             else:
@@ -329,6 +331,32 @@ class AgentSDKRunner(Runner):
     def _stage(self, job_id, firm, i, n, label):
         self.s.run("UPDATE jobs SET stage=?, progress=? WHERE id=?", (i, i / n, job_id))
         self.s.event("stage", label, job_id, firm)
+
+    def _run_dani(self, job_id):
+        s = self.s
+        j = s.one("SELECT * FROM jobs WHERE id=?", (job_id,))
+        firm, title = j["firm"], j["title"]
+        try:
+            s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+            s.event("start", "Dani picked up the demand", job_id, firm)
+            raw = (self.root / "firms" / "dani" / "agents" / "dani.md").read_text()
+            persona = raw.split("---", 2)[2].strip() if raw.startswith("---") else raw
+            self._stage(job_id, firm, 0, 2, "Dani is thinking it through")
+            memo = self._say(persona + "\nThe corpus of his public words is not loaded in this service, so do not quote him; give his judgment as the persona describes it and say plainly where you are reasoning rather than recalling. Use web_search for facts you rely on; mark anything unverified. Write in Markdown, answer first, under 700 words; refer to Daniel in the third person.",
+                             f"Mandate: {title}\n\nSteering notes: {' '.join(self.notes.get(job_id, [])) or 'none'}", 2200, True, {}, job_id, "Dani")
+            vault = Path(os.environ.get("HOLDINGS_DATA") or self.root / "server" / "data") / "vault" / f"job-{job_id}"
+            vault.mkdir(parents=True, exist_ok=True)
+            (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\nAdvisory second opinion from an AI modelled on Daniel Dippold. Not Daniel, not verified.\n")
+            self._stage(job_id, firm, 1, 2, "Desk is preparing the files")
+            self._deliver(job_id, firm, title, memo, "advisory, not verified", "dani", json.loads(j["formats"]))
+            s.run("UPDATE jobs SET status='done', progress=1, stage=1 WHERE id=?", (job_id,))
+            s.event("done", "Dani's take is in the Library.", job_id, firm)
+        except cost.CapStop:
+            s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
+            s.event("error", "Stopped at your spend cap.", job_id, firm)
+        except Exception as e:
+            s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
+            s.event("error", f"Run stopped: {type(e).__name__}: {str(e)[:160]}", job_id, firm)
 
     def _run(self, job_id):
         s = self.s

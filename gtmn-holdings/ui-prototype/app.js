@@ -168,12 +168,14 @@
     return { stages, cur, people, f, now: stages[cur], next: stages.filter(s => s.st === "next") };
   }
   const STL = { wait: "Waiting to start", work: "Working", need: "Needs you", done: "Done" };
+  const jc = j => { const r = window.__byJob && window.__byJob[j.id]; return r ? "$" + (r >= 100 ? r.toFixed(0) : r.toFixed(2)) : ""; };
+  const jcost = j => jc(j) ? `<span class="jc" title="Estimated spend on this demand">${jc(j)}</span>` : "";
   function work() {
     if (S.work) return workDetail(jobs.find(j => j.id === S.work));
     const by = S.workBy, c = k => jobs.filter(j => j.col === k).length;
     const row = j => { const d = detail(j), f = d.f, ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
       return `<button class="wrow" data-work="${j.id}" style="--a:${ac}"><span class="wt"><b>${esc(j.t)}</b><small>${by === "firm" ? "" : esc(f.name) + " · "}${j.col === "done" ? "Finished" : j.col === "wait" ? "Queued" : esc(d.now.nm)}</small></span>
-      <span class="seg" aria-hidden="true">${d.stages.map(s => `<i class="${s.st}"></i>`).join("")}</span><span class="pc">${Math.round(j.p * 100)}%</span><span class="st ${j.col}">${STL[j.col]}</span></button>`; };
+      <span class="seg" aria-hidden="true">${d.stages.map(s => `<i class="${s.st}"></i>`).join("")}</span><span class="pc">${Math.round(j.p * 100)}%</span>${jcost(j)}<span class="st ${j.col}">${STL[j.col]}</span></button>`; };
     const groups = by === "firm" ? [...FIRMS.map(x => [x, jobs.filter(j => j.f === x.id)]), [PLENARY, jobs.filter(j => j.f === "plenary")]].filter(g => g[1].length).sort((a, b) => b[1].length - a[1].length || 0)
       : ["need", "work", "wait", "done"].map(k => [{ name: STL[k], accent: "#16181D" }, jobs.filter(j => j.col === k)]).filter(g => g[1].length);
     return `${header("Work", "What every firm is doing. Tap one to go deeper.")}
@@ -188,7 +190,7 @@
     const card = cards.find(c => c.job === j.id);
     return `<div class="crumbs"><button data-wback="1">Work</button> / ${esc(j.t)}</div>
     <div class="wdet" style="--a:${ac}">
-      <div class="whead"><div><span class="st ${j.col}">${STL[j.col]}</span><h1>${esc(j.t)}</h1><p class="sub">${esc(f.name)}${j.col !== "done" && j.col !== "wait" ? " · now: " + esc(d.now.nm) : ""}</p></div>${ring(j.p, ac)}</div>
+      <div class="whead"><div><span class="st ${j.col}">${STL[j.col]}</span><h1>${esc(j.t)}</h1><p class="sub">${esc(f.name)}${j.col !== "done" && j.col !== "wait" ? " · now: " + esc(d.now.nm) : ""}${jcost(j) ? ` · spent <b>${jc(j)}</b> so far` : ""}</p></div>${ring(j.p, ac)}</div>
       ${card ? `<button class="needbar" data-goneeds="1"><b>${esc(card.agent)} is waiting for you</b><span>${esc(card.q)}</span><em>Answer →</em></button>` : ""}
       <h2>Progress</h2>
       <ol class="steps">${d.stages.map((s, i) => `<li class="${s.st}"><i>${s.st === "done" ? "✓" : i + 1}</i><span>${esc(s.nm)}</span></li>`).join("")}</ol>
@@ -605,7 +607,7 @@
     if (CB.open && !pop) { pop = document.createElement("div"); pop.id = "cbpop"; pop.className = "cb-pop"; document.body.appendChild(pop); }
     if (pop) { if (!CB.open) pop.remove(); else if (!pop.dataset.f) { pop.dataset.f = 1; pop.innerHTML = `<h4>Monthly spending cap</h4><small>Runs pause when it is reached. You can extend it or stop them. Resets each month.</small><label for="cbv">Cap in USD</label><input id="cbv" type="number" min="1" step="1" value="${Math.round(d.base)}"><label for="cbe">Or add extra this month</label><input id="cbe" type="number" min="1" step="1" placeholder="e.g. 10"><div class="row"><button class="pri" data-cbsave="1">Save</button><button data-cbclose="1">Close</button></div>`; } }
   }
-  function pullCost() { fetch("/api/cost").then(r => r.ok ? r.json() : null).then(d => { if (d) { CB.d = d; drawCost(); } }).catch(() => {}); }
+  function pullCost() { fetch("/api/cost").then(r => r.ok ? r.json() : null).then(d => { if (d) { const was = JSON.stringify(window.__byJob || {}); window.__byJob = Object.fromEntries((d.by_job || []).map(x => [x.job, x.usd])); CB.d = d; drawCost(); if (was !== JSON.stringify(window.__byJob) && S.tab === "work") render(); } }).catch(() => {}); }
   function postCost(body) { return fetch("/api/cost", { method: "POST", body: JSON.stringify(body) }).then(r => r.json()).then(d => { if (d.error) { toast("Could not save: " + d.error); return; } CB.d = d; drawCost(); }).catch(() => toast("Could not reach the server.")); }
   document.addEventListener("click", e => {
     const t = e.target.closest("[data-cbext],[data-cbstop],[data-cbset],[data-cbsave],[data-cbclose]"); if (!t) return;

@@ -74,13 +74,22 @@ def run(r, job_id):
 
         seats = []
 
-        def choose(fid):
+        def _choose(fid):
             ds = {p.stem: _frontmatter(p) for p in agents_dir(fid).glob("*.md")}
             lst = "\n".join(f"- {k}: {v[0]} — {v[1]}" for k, v in ds.items())
             got = _json(say(f"You are the Chair of the GTMN Plenary choosing seats from one firm's bench. Each person has a specialty. Pick every seat whose specialty the mandate actually needs, at least one and at most {SEATS_PER_FIRM}, and leave the rest of the bench out; more can be called in later. Reply with JSON only.",
                                f"Mandate: {title}\nIssues: {pick.get('issues')}\n\nBench of {avail[fid]['name']}:\n{lst}\n\nReturn {{\"seats\": [seat ids, one to {SEATS_PER_FIRM}]}}", 300))
             for sid in got["seats"][:SEATS_PER_FIRM]:
                 if sid in ds:
+                    seats.append((fid, sid, ds[sid][0]))
+        def choose(fid):
+            try:
+                _choose(fid)
+            except Exception as e:
+                s.event("step", f"Seat choice failed for {avail[fid]['name']} ({type(e).__name__}: {str(e)[:120]}); seating the first bench members", job_id, firm)
+            if not any(f == fid for f, _, _ in seats):
+                ds = {p.stem: _frontmatter(p) for p in sorted(agents_dir(fid).glob("*.md"))}
+                for sid in list(ds)[:SEATS_PER_FIRM]:
                     seats.append((fid, sid, ds[sid][0]))
         ts = [threading.Thread(target=choose, args=(f,)) for f in fids]
         [t.start() for t in ts]

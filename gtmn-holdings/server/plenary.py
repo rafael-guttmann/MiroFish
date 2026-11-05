@@ -4,6 +4,7 @@ list, one cross-examination turn, Rafael decides what stays open, a verified dec
 The Chair never takes a view on substance; firm text is filed verbatim."""
 import granola
 import json
+import os
 from pathlib import Path
 import re
 import threading

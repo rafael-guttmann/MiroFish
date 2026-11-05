@@ -347,10 +347,23 @@
   const chSt = c => (rev[c.id] || {}).decision || "proposed";
   const agName = id => { for (const f of FIRMS) { const a = f.agents.find(x => x.id === id); if (a) return a.name; } return id; };
   fetch("/api/charters").then(r => r.ok ? r.json() : []).then(l => { l.forEach(x => rev[x.charter] = x); if (l.length) { localStorage.setItem("chRev", JSON.stringify(rev)); if (S.tab === "charters") render(); updCb(); } }).catch(() => {});
+  const EDITS = {};
+  function loadEdits() { fetch("/api/charter-edits").then(r => r.ok ? r.json() : {}).then(e => { Object.keys(e).forEach(id => { EDITS[id] = e[id]; const c = CH.find(x => x.id === id); if (c) { c.summary = e[id].summary ?? c.summary; c.notes = e[id].notes ?? c.notes; c.owns = e[id].owns ?? c.owns; } }); if (S.tab === "charters") render(); }).catch(() => {}); }
+  loadEdits();
+  function applyChanges() {
+    S.applying = true; render();
+    fetch("/api/charters/apply-changes", { method: "POST", body: "{}" }).then(r => r.json()).then(j => {
+      S.applying = false;
+      if (j.error) { toast("Could not apply: " + j.error); return render(); }
+      const ok = (j.results || []).filter(x => !x.error).length, bad = (j.results || []).length - ok;
+      toast(ok ? `Updated ${ok} charter${ok > 1 ? "s" : ""}. Review and approve again.` : "Nothing was updated." + (bad ? " Try again." : ""));
+      fetch("/api/charters").then(r => r.json()).then(l => { Object.keys(rev).forEach(k => delete rev[k]); l.forEach(x => rev[x.charter] = x); localStorage.setItem("chRev", JSON.stringify(rev)); updCb(); loadEdits(); render(); });
+    }).catch(() => { S.applying = false; toast("Could not reach the server."); render(); });
+  }
   function updCb() { const n = CH.filter(c => chSt(c) === "proposed").length, b = document.getElementById("cbadge"); if (b) { b.textContent = n || ""; b.dataset.n = n; } }
   function charters() {
-    const n = CH.filter(c => chSt(c) === "proposed").length;
-    return `<h1>Charters</h1><p class="lede" style="color:var(--ink2);font-size:14px;line-height:1.5;margin:6px 0 14px">A charter is a firm's rulebook: who sits on it, which gates it must pass, who can veto, and what it delivers. A firm only takes demands once you approve its charter. ${n ? `${n} of ${CH.length} waiting for you.` : "All reviewed."}</p>` + CH.map(c => {
+    const n = CH.filter(c => chSt(c) === "proposed").length, nc = CH.filter(c => chSt(c) === "changes" && ((rev[c.id] || {}).note || "").trim()).length;
+    return `<h1>Charters</h1><p class="lede" style="color:var(--ink2);font-size:14px;line-height:1.5;margin:6px 0 14px">A charter is a firm's rulebook: who sits on it, which gates it must pass, who can veto, and what it delivers. A firm only takes demands once you approve its charter. ${n ? `${n} of ${CH.length} waiting for you.` : "All reviewed."}</p>${nc ? `<div class="ch-apply"><div><b>${nc} charter${nc > 1 ? "s have" : " has"} requested changes</b><small>The charter desk reads your notes and updates the wording. You then approve again.</small></div><button class="submit" data-applych="1" ${S.applying ? "disabled" : ""}>${S.applying ? "Updating…" : "Apply my changes"}</button></div>` : ""}` + CH.map(c => {
       const s = chSt(c), open = S.chOpen === c.id, r = rev[c.id] || {};
       const lab = { proposed: "Waiting for you", approved: "Approved", changes: "Changes requested" }[s];
       const body = open ? `<div class="ch-b"><h4>What it is</h4><p>${esc(c.summary)}</p>
@@ -359,6 +372,7 @@
         <h4>Can veto</h4><ul>${c.veto.map(v => `<li>${esc(v.ground || v)}</li>`).join("") || "<li>No vetoes</li>"}</ul>
         <h4>Delivers</h4><p>${c.outputs.map(esc).join(", ")}</p>
         ${c.notes ? `<h4>Notes</h4><p>${esc(c.notes)}</p>` : ""}
+        ${EDITS[c.id] && EDITS[c.id].applied ? `<h4>What the charter desk changed</h4><p>${esc(EDITS[c.id].applied)}</p>${EDITS[c.id].cannot ? `<p><b>Not done:</b> ${esc(EDITS[c.id].cannot)}</p>` : ""}` : ""}
         ${r.note ? `<h4>Your last note</h4><p>${esc(r.note)}</p>` : ""}
         <div class="ch-act"><textarea id="chnote" placeholder="Anything to change? (optional)" aria-label="Note on this charter"></textarea>
         <button class="chip" data-chrev="${c.id}:changes">Request changes</button><button class="submit" data-chrev="${c.id}:approved">${s === "approved" ? "Approved ✓" : "Approve charter"}</button></div></div>` : "";
@@ -441,6 +455,7 @@
   document.addEventListener("click", e => {
     const t = e.target.closest("button"); if (!t) return;
     if (t.dataset.chopen) { S.chOpen = S.chOpen === t.dataset.chopen ? null : t.dataset.chopen; const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; return; }
+    if (t.dataset.applych) { applyChanges(); return; }
     if (t.dataset.chrev) { const [i, d] = t.dataset.chrev.split(":"); review(i, d); return; }
     if (t.dataset.tab) { S.fmtOpen = null; S.tab = t.dataset.tab; if (S.tab === "board") S.work = null; if (S.tab === "office") { S.firm = null; S.agent = null; } render(); }
     else if (t.dataset.firm && S.tab === "office") { S.firm = t.dataset.firm; S.agent = null; S.showAll = false; render(); }

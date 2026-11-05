@@ -69,6 +69,10 @@ for f in (ROOT / "charters").glob("*.json"):
 DATA = Path(os.environ.get("HOLDINGS_DATA") or HERE / "data")
 DATA.mkdir(parents=True, exist_ok=True)
 store = Store(DATA / "holdings.db")
+EDITABLE = ("summary", "notes", "owns")
+for e in store.rows("SELECT charter, patch FROM charter_edits WHERE id IN (SELECT MAX(id) FROM charter_edits GROUP BY charter)"):
+    if e["charter"] in charters:
+        charters[e["charter"]].update(json.loads(e["patch"]))
 runner = AgentSDKRunner(store, charters, ROOT) if os.environ.get("HOLDINGS_RUNNER") == "sdk" else SimulatedRunner(store, charters)
 
 
@@ -155,6 +159,9 @@ class H(BaseHTTPRequestHandler):
                                     "partners": c.get("senior_panel", []), "outputs": c.get("outputs", [])} for c in charters.values()])
         if p == "/api/charters":
             return self.send(200, store.rows("SELECT charter, decision, note, created FROM charter_reviews r WHERE id=(SELECT MAX(id) FROM charter_reviews WHERE charter=r.charter)"))
+        if p == "/api/charter-edits":
+            return self.send(200, {e["charter"]: {**json.loads(e["patch"]), "applied": e["applied"], "cannot": e["cannot"], "created": e["created"]}
+                                   for e in store.rows("SELECT * FROM charter_edits WHERE id IN (SELECT MAX(id) FROM charter_edits GROUP BY charter)")})
         if p == "/api/jobs":
             return self.send(200, store.rows("SELECT * FROM jobs ORDER BY id DESC"))
         m = re.fullmatch(r"/api/jobs/(\d+)", p)
@@ -260,6 +267,36 @@ class H(BaseHTTPRequestHandler):
             store.event("answer", "Rafael answered a card", c["job"], c["firm"])
             runner.card_answered(int(m[1]))
             return self.send(200, {"ok": True})
+        if p == "/api/charters/apply-changes":
+            if not hasattr(runner, "client"):
+                return self.send(400, {"error": "needs the live Claude runner"})
+            pending = store.rows("SELECT charter, note FROM charter_reviews r WHERE id=(SELECT MAX(id) FROM charter_reviews WHERE charter=r.charter) AND decision='changes' AND TRIM(note)<>''")
+            out = []
+            for r in pending:
+                c = charters.get(r["charter"])
+                if not c:
+                    continue
+                cur = {k: c.get(k) for k in EDITABLE}
+                try:
+                    txt = runner._say(
+                        "You revise a firm's charter for Rafael, the principal. Reply with ONE JSON object only, no prose, with keys: "
+                        "summary (string), notes (string), owns (array of strings), applied (one or two plain sentences saying what you changed), "
+                        "cannot (plain sentence on any request you could not do because it needs the gates, seats, vetoes or outputs changed by a developer, else empty string). "
+                        "Gates, vetoes, seats and outputs are enforced elsewhere: never pretend to change them in the notes; put such requests in cannot. Change only what the request asks. Keep every other word as it is. Never remove a safeguard or veto.",
+                        f"Current charter fields:\n{json.dumps(cur)}\n\nRafael's requested changes:\n{r['note']}", max_tokens=1500, who="Charter desk")
+                    j = json.loads(txt[txt.index("{"): txt.rindex("}") + 1])
+                    patch = {k: j[k] for k in EDITABLE if k in j and type(j[k]) is type(cur[k] if cur[k] is not None else j[k])}
+                except Exception as ex:
+                    out.append({"charter": r["charter"], "error": str(ex)[:120]})
+                    continue
+                c.update(patch)
+                now = time.time()
+                store.run("INSERT INTO charter_edits(charter,patch,applied,cannot,request,created) VALUES(?,?,?,?,?,?)",
+                          (r["charter"], json.dumps(patch), str(j.get("applied", ""))[:600], str(j.get("cannot", ""))[:600], r["note"], now))
+                store.run("INSERT INTO charter_reviews(charter,decision,note,created) VALUES(?,?,?,?)", (r["charter"], "proposed", "", now))
+                store.event("charter", f"Charter desk updated the {c['name']} charter from Rafael's requested changes", None, r["charter"])
+                out.append({"charter": r["charter"], "applied": j.get("applied", ""), "cannot": j.get("cannot", "")})
+            return self.send(200, {"results": out})
         m = re.fullmatch(r"/api/charters/([a-z0-9-]+)/review", p)
         if m:
             d = b.get("decision")

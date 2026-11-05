@@ -10,6 +10,7 @@ import re
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import hashlib
 import hmac
 from urllib.parse import quote, unquote, urlparse
 
@@ -30,6 +31,33 @@ ROOT = HERE.parent
 UI = ROOT / "ui-prototype"
 TOKEN = os.environ.get("HOLDINGS_TOKEN", "")
 MAX_BODY = 1_000_000
+USER = os.environ.get("HOLDINGS_USER", "")
+PW_HASH = os.environ.get("HOLDINGS_PW_HASH", "")
+fails = {}
+
+
+def check_login(user, password):
+    try:
+        _, it, salt, h = PW_HASH.split("$")
+        got = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), int(it)).hex()
+    except ValueError:
+        return False
+    return hmac.compare_digest(user, USER) & hmac.compare_digest(got, h)
+
+
+def make_session(user):
+    exp = str(int(time.time()) + 30 * 86400)
+    sig = hmac.new(TOKEN.encode(), f"{user}|{exp}".encode(), "sha256").hexdigest()
+    return f"{user}|{exp}|{sig}"
+
+
+def valid_session(v):
+    try:
+        user, exp, sig = v.rsplit("|", 2)
+    except ValueError:
+        return False
+    good = hmac.new(TOKEN.encode(), f"{user}|{exp}".encode(), "sha256").hexdigest()
+    return hmac.compare_digest(sig, good) and int(exp) > time.time() and hmac.compare_digest(user, USER)
 FORMATS = {"Excel", "PowerPoint", "Word", "PDF", "JPEG", "Markdown"}
 
 charters = {}
@@ -95,15 +123,16 @@ class H(BaseHTTPRequestHandler):
         got = self.headers.get("Authorization", "")
         if got.startswith("Bearer ") and hmac.compare_digest(got[7:], TOKEN):
             return True
-        m = re.search(r"(?:^|;\s*)holdings_token=([^;]+)", self.headers.get("Cookie", ""))
-        return bool(m) and hmac.compare_digest(unquote(m.group(1)), TOKEN)
+        m = re.search(r"(?:^|;\s*)holdings_session=([^;]+)", self.headers.get("Cookie", ""))
+        return bool(m) and valid_session(unquote(m.group(1)))
 
     def login_page(self, err=""):
         html = ("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>GTMN Holdings</title>"
                 "<body style='font:16px system-ui;background:#f5f2ec;display:grid;place-items:center;height:100vh;margin:0'>"
                 "<form method=post action=/login style='background:#fff;padding:32px;border-radius:12px;width:min(340px,90vw);box-shadow:0 2px 12px #0002'>"
-                "<h2 style='margin:0 0 4px'>GTMN Holdings</h2><p style='margin:0 0 16px;color:#666'>Enter your access key.</p>"
-                "<input type=password name=token autofocus required style='width:100%;padding:10px;box-sizing:border-box;border:1px solid #bbb;border-radius:8px'>"
+                "<h2 style='margin:0 0 4px'>GTMN Holdings</h2><p style='margin:0 0 16px;color:#666'>Sign in.</p>"
+                "<input name=user placeholder=Username autocomplete=username autofocus required style='width:100%;padding:10px;box-sizing:border-box;border:1px solid #bbb;border-radius:8px;margin-bottom:8px'>"
+                "<input type=password name=password placeholder=Password autocomplete=current-password required style='width:100%;padding:10px;box-sizing:border-box;border:1px solid #bbb;border-radius:8px'>"
                 f"<p style='color:#b00;min-height:1.2em'>{err}</p><button style='width:100%;padding:10px;border:0;border-radius:8px;background:#1a1a1a;color:#fff'>Open</button></form>")
         self.send(200, html.encode(), "text/html; charset=utf-8")
 
@@ -161,16 +190,22 @@ class H(BaseHTTPRequestHandler):
         p = urlparse(self.path).path
         if p == "/login":
             raw = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 2000)).decode()
-            tok = parse_qs(raw).get("token", [""])[0]
-            if TOKEN and hmac.compare_digest(tok, TOKEN):
+            q = parse_qs(raw)
+            ip = self.headers.get("X-Forwarded-For", self.client_address[0]).split(",")[0].strip()
+            now = time.time()
+            fails[ip] = [x for x in fails.get(ip, []) if now - x < 600]
+            if len(fails[ip]) >= 8:
+                return self.send(429, {"error": "too many attempts, wait 10 minutes"})
+            if TOKEN and check_login(q.get("user", [""])[0], q.get("password", [""])[0]):
                 secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
                 self.send_response(303)
-                self.send_header("Set-Cookie", f"holdings_token={quote(tok)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000{secure}")
+                self.send_header("Set-Cookie", f"holdings_session={quote(make_session(q['user'][0]))}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000{secure}")
                 self.send_header("Location", "/")
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return
-            return self.login_page("That key is not right.")
+            fails[ip].append(now)
+            return self.login_page("Wrong username or password.")
         if not self.authed():
             return self.send(401, {"error": "unauthorized"})
         try:

@@ -53,9 +53,11 @@ class SimulatedRunner(Runner):
         ch = self.charters.get(j["firm"], {})
         stages, firm = stages_for(ch), j["firm"]
         seats = [a["id"] for a in ch.get("agents", [])][:4] or ["desk"]
-        s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+        s.run("UPDATE jobs SET status='working' WHERE id=? AND status!='stopped'", (job_id,))
         s.event("start", f"{ch.get('name', firm)} picked up the demand", job_id, firm)
         for i, stage in enumerate(stages):
+            if (s.one("SELECT status FROM jobs WHERE id=?", (job_id,)) or {}).get("status") in (None, "stopped"):
+                return
             s.run("UPDATE jobs SET stage=?, progress=? WHERE id=?", (i, i / len(stages), job_id))
             s.event("stage", f"{seats[i % len(seats)]} started: {stage}", job_id, firm, {"stage": stage})
             time.sleep(self.tick)
@@ -76,11 +78,11 @@ class SimulatedRunner(Runner):
                    "opts": [["Recommended path", "The safer option.", 1], ["Alternative", "Faster, with more risk."]],
                    "why": "The next steps depend on this choice.", "def": "Nothing moves until you answer."}
         cid = self.s.run("INSERT INTO cards(job,firm,payload,created) VALUES(?,?,?,?)", (job_id, firm, json.dumps(payload), time.time()))
-        self.s.run("UPDATE jobs SET status='asking' WHERE id=?", (job_id,))
+        self.s.run("UPDATE jobs SET status='asking' WHERE id=? AND status!='stopped'", (job_id,))
         self.s.event("card", payload["q"], job_id, firm, {"card": cid})
         ev = self.waiting[cid] = threading.Event()
         ev.wait()
-        self.s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+        self.s.run("UPDATE jobs SET status='working' WHERE id=? AND status!='stopped'", (job_id,))
         return True
 
     def _ask_formats(self, job_id, firm):
@@ -157,7 +159,7 @@ class AgentSDKRunner(Runner):
                               f"Mandate: {j['title']}\nRun status: {j['status']}\nRafael's note: {text}", 300, job_id=job_id, who=f"{firm} desk").strip())
                 return
             with self._revlock:
-                s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+                s.run("UPDATE jobs SET status='working' WHERE id=? AND status!='stopped'", (job_id,))
                 s.event("steer", f"{firm} desk is revising the memo from your note", job_id, j["firm"])
                 last = s.one("SELECT src FROM docs WHERE job=? AND src LIKE 'revision-%' ORDER BY version DESC LIMIT 1", (job_id,))
                 raw = (vault / last["src"]).read_text() if last and (vault / last["src"]).is_file() else src.read_text()
@@ -351,7 +353,7 @@ class AgentSDKRunner(Runner):
         j = s.one("SELECT * FROM jobs WHERE id=?", (job_id,))
         firm, title = j["firm"], j["title"]
         try:
-            s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='working' WHERE id=? AND status!='stopped'", (job_id,))
             s.event("start", "Dani picked up the demand", job_id, firm)
             raw = (self.root / "firms" / "dani" / "agents" / "dani.md").read_text()
             persona = raw.split("---", 2)[2].strip() if raw.startswith("---") else raw
@@ -379,10 +381,10 @@ class AgentSDKRunner(Runner):
             s.run("UPDATE jobs SET status='done', progress=1, stage=2 WHERE id=?", (job_id,))
             s.event("done", "Dani's take is in the Library.", job_id, firm)
         except cost.CapStop:
-            s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='waiting' WHERE id=? AND status!='stopped'", (job_id,))
             s.event("error", "Stopped at your spend cap.", job_id, firm)
         except Exception as e:
-            s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='waiting' WHERE id=? AND status!='stopped'", (job_id,))
             s.event("error", f"Run stopped: {type(e).__name__}: {str(e)[:160]}", job_id, firm)
 
     def _run(self, job_id):
@@ -390,7 +392,7 @@ class AgentSDKRunner(Runner):
         j = s.one("SELECT * FROM jobs WHERE id=?", (job_id,))
         firm, title = j["firm"], j["title"]
         try:
-            s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='working' WHERE id=? AND status!='stopped'", (job_id,))
             s.event("start", "Office of the CTO picked up the demand", job_id, firm)
             self._stage(job_id, firm, 0, 4, "Desk framed the mandate; seats start blind")
             seats = list(self.SEAT_NAMES)
@@ -415,12 +417,12 @@ class AgentSDKRunner(Runner):
             except Exception:
                 payload = {"kind": "one", "q": "Which direction should the memo recommend?", "opts": [["Follow the majority", "", 1], ["Keep the dissent visible"]], "why": "The seats differ.", "def": "Nothing moves until you answer."}
             cid = s.run("INSERT INTO cards(job,firm,payload,created) VALUES(?,?,?,?)", (job_id, firm, json.dumps(payload), time.time()))
-            s.run("UPDATE jobs SET status='asking' WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='asking' WHERE id=? AND status!='stopped'", (job_id,))
             s.event("card", payload["q"], job_id, firm, {"card": cid})
             ev = self.waiting[cid] = threading.Event()
             ev.wait()
             answer = (s.one("SELECT answer FROM cards WHERE id=?", (cid,)) or {}).get("answer") or ""
-            s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='working' WHERE id=? AND status!='stopped'", (job_id,))
             self._stage(job_id, firm, 2, 4, "Desk is writing the decision memo")
             steer = "\n".join(self.notes.get(job_id, []))
             memo = self._say("You are the orchestrating desk of the Office of the CTO at GTMN Holdings. Write a decision memo in a senior consulting partner's register: answer first, then reasoning, preserved dissent, risks, next steps. Markdown, under 900 words.",
@@ -434,5 +436,5 @@ class AgentSDKRunner(Runner):
             s.run("UPDATE jobs SET status='done', progress=1, stage=3 WHERE id=?", (job_id,))
             s.event("done", "Memo is in the vault and the Library.", job_id, firm)
         except Exception as e:
-            s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='waiting' WHERE id=? AND status!='stopped'", (job_id,))
             s.event("error", f"Run stopped: {type(e).__name__}: {str(e)[:160]}", job_id, firm)

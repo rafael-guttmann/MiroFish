@@ -13,6 +13,17 @@ class CapStop(Exception):
     pass
 
 
+class JobStopped(CapStop):
+    pass
+
+
+def _check_job(s, job_id):
+    if job_id:
+        j = s.one("SELECT status FROM jobs WHERE id=?", (job_id,))
+        if not j or j["status"] == "stopped":
+            raise JobStopped("stopped by Rafael")
+
+
 def _price(model):
     m = (model or "").lower()
     for k, v in PRICES.items():
@@ -67,6 +78,7 @@ def _start_of_month(now):
 
 def gate(s, job_id=None, who=""):
     """Block a call while the cap is reached. Raises CapStop if Rafael chooses to stop."""
+    _check_job(s, job_id)
     st = status(s)
     if not st["paused"]:
         return
@@ -76,6 +88,7 @@ def gate(s, job_id=None, who=""):
         s.event("cost", f"Paused: the ${st['cap']:.0f} monthly cap is reached. Waiting for Rafael to extend or stop.", job_id, None)
     while True:
         time.sleep(2)
+        _check_job(s, job_id)
         st = status(s)
         if st["stopped_epoch"] != epoch:
             raise CapStop("stopped at the spending cap")

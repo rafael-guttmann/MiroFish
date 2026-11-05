@@ -47,7 +47,7 @@ def run(r, job_id):
 
     avail = {fid: c for fid, c in r.charters.items() if fid != "dani" and agents_dir(fid).is_dir() and approved(fid)}
     try:
-        s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+        s.run("UPDATE jobs SET status='working' WHERE id=? AND status!='stopped'", (job_id,))
         s.event("start", "The desk opened the mandate" if single else "The Chair opened the Plenary", job_id, firm)
         r._stage(job_id, firm, 0, 5, "Desk is choosing which specialists to seat" if single else "Chair is deciding which firms must be in the room")
 
@@ -205,13 +205,13 @@ def run(r, job_id):
                                 f"Issue: {i['question']}\n\nPositions:\n{pos}\n\nCross-examination:\n{v2}\n\nReturn {{\"q\": ..., \"why\": one sentence on the consequence, \"opts\": [[label, one-line consequence], ...2-3 options, last one \"Send back with an instruction\"]]}}", 800))
             payload = {"kind": "one", "q": card["q"], "opts": card["opts"], "why": card.get("why", ""), "def": "Nothing moves until you answer."}
             cid = s.run("INSERT INTO cards(job,firm,payload,created) VALUES(?,?,?,?)", (job_id, firm, json.dumps(payload), time.time()))
-            s.run("UPDATE jobs SET status='asking' WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='asking' WHERE id=? AND status!='stopped'", (job_id,))
             s.event("card", payload["q"], job_id, firm, {"card": cid})
             ev = r.waiting[cid] = threading.Event()
             ev.wait()
             ans = (s.one("SELECT answer FROM cards WHERE id=?", (cid,)) or {}).get("answer") or ""
             decisions.append((i, ans))
-            s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='working' WHERE id=? AND status!='stopped'", (job_id,))
         left = open_i[MAX_CARDS:]
         s.event("step", "Desk is writing the decision memo", job_id, firm)
 
@@ -228,5 +228,5 @@ def run(r, job_id):
         s.run("UPDATE jobs SET status='done', progress=1, stage=4 WHERE id=?", (job_id,))
         s.event("done", f"{'Firm' if single else 'Plenary'} closed with {len(seats)} seats from {len(fids)} firm{'' if single else 's'}. Memo is in the Library.", job_id, firm)
     except Exception as e:
-        s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))
+        s.run("UPDATE jobs SET status='waiting' WHERE id=? AND status!='stopped'", (job_id,))
         s.event("error", f"Plenary stopped: {type(e).__name__}: {str(e)[:160]}", job_id, firm)

@@ -9,7 +9,7 @@
   const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   let live = false, sig = "";
-  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), granola: true, convened: ["gtmn-cto", "dani", "spc-deal-team"] };
+  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", wmode: false, wsel: new Set(), arch: false, open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), granola: true, convened: ["gtmn-cto", "dani", "spc-deal-team"] };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
   const firmAgents = f => f.agents.map(a => ({ ...a, st: S.state[f.id + "/" + a.id] }));
@@ -23,6 +23,8 @@
   pick(byId["zencredit-firm"], 2, "working", "Running the hazard model");
   set("dani", "dani", "working", "Giving a second opinion on the founding team");
 
+  let ajobs = [];
+  const jobOf = id => jobs.find(j => j.id === id) || ajobs.find(j => j.id === id);
   let jobs = [
     { id: 1, t: "Evaluate the AgentOps vendor pitch", f: "gtmn-cto", col: "work", p: .6 },
     { id: 2, t: "Go/no-go: acquire a Brazilian fintech", f: "plan-house", col: "need", p: .35 },
@@ -158,7 +160,7 @@
     const names = STG[j.f] || STG.def, n = names.length, pool = WORKERS(j), f = fl(j.f);
     const cur = j.p >= 1 ? n : Math.min(n - 1, Math.floor(j.p * n));
     const stages = names.map((nm, i) => {
-      const st = i < cur ? "done" : i === cur ? (j.col === "need" ? "ask" : j.col === "wait" ? "next" : "now") : "next";
+      const st = i < cur ? "done" : i === cur ? (j.col === "need" ? "ask" : j.col === "wait" || j.col === "stop" ? "next" : "now") : "next";
       const who = [0, 1].map(k => pool[(j.id * 3 + i * 2 + k) % pool.length]);
       const steps = st === "next" ? [] : who.map((w, k) => ({ w, what: DOES[(i * 2 + k + j.id) % DOES.length], t: st === "done" ? `${9 + i}:${k ? "40" : "05"}` : "now" }));
       return { nm, st, who, steps };
@@ -167,21 +169,23 @@
     const people = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 6);
     return { stages, cur, people, f, now: stages[cur], next: stages.filter(s => s.st === "next") };
   }
-  const STL = { wait: "Waiting to start", work: "Working", need: "Needs you", done: "Done" };
+  const STL = { wait: "Waiting to start", work: "Working", need: "Needs you", done: "Done", stop: "Stopped" };
+  const LIVE = j => ["wait", "work", "need"].includes(j.col);
   const jc = j => { const r = window.__byJob && window.__byJob[j.id]; return r ? "$" + (r >= 100 ? r.toFixed(0) : r.toFixed(2)) : ""; };
   const jcost = j => jc(j) ? `<span class="jc" title="Estimated spend on this demand">${jc(j)}</span>` : "";
   function work() {
-    if (S.work) return workDetail(jobs.find(j => j.id === S.work));
-    const by = S.workBy, c = k => jobs.filter(j => j.col === k).length;
-    const row = j => { const d = detail(j), f = d.f, ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
-      return `<button class="wrow" data-work="${j.id}" style="--a:${ac}"><span class="wt"><b>${esc(j.t)}</b><small>${by === "firm" ? "" : esc(f.name) + " · "}${j.col === "done" ? "Finished" : j.col === "wait" ? "Queued" : esc(d.now.nm)}</small></span>
-      <span class="seg" aria-hidden="true">${d.stages.map(s => `<i class="${s.st}"></i>`).join("")}</span><span class="pc">${Math.round(j.p * 100)}%</span>${jcost(j)}<span class="st ${j.col}">${STL[j.col]}</span></button>`; };
-    const groups = by === "firm" ? [...FIRMS.map(x => [x, jobs.filter(j => j.f === x.id)]), [PLENARY, jobs.filter(j => j.f === "plenary")]].filter(g => g[1].length).sort((a, b) => b[1].length - a[1].length || 0)
-      : ["need", "work", "wait", "done"].map(k => [{ name: STL[k], accent: "#16181D" }, jobs.filter(j => j.col === k)]).filter(g => g[1].length);
+    if (S.work) { const jj = jobOf(S.work); if (jj) return workDetail(jj); S.work = null; }
+    const by = S.workBy, list = S.arch ? ajobs : jobs, c = k => list.filter(j => j.col === k).length;
+    const row = j => { const d = detail(j), f = d.f, ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent, on = S.wsel.has(j.id);
+      return `<div class="wr${on ? " on" : ""}">${S.wmode ? `<button class="wck" data-wpick="${j.id}" aria-pressed="${on}" aria-label="Select ${esc(j.t)}">${on ? "✓" : ""}</button>` : ""}<button class="wrow" data-work="${j.id}" style="--a:${ac}"><span class="wt"><b>${esc(j.t)}</b><small>${by === "firm" ? "" : esc(f.name) + " · "}${j.col === "done" ? "Finished" : j.col === "stop" ? "Stopped by you" : j.col === "wait" ? "Queued" : esc(d.now.nm)}</small></span>
+      <span class="seg" aria-hidden="true">${d.stages.map(s => `<i class="${s.st}"></i>`).join("")}</span><span class="pc">${Math.round(j.p * 100)}%</span>${jcost(j)}<span class="st ${j.col}">${STL[j.col]}</span></button>${!S.wmode && live && LIVE(j) ? `<button class="wstop" data-wstop="${j.id}" aria-label="Stop ${esc(j.t)}">Stop</button>` : ""}</div>`; };
+    const groups = by === "firm" ? [...FIRMS.map(x => [x, list.filter(j => j.f === x.id)]), [PLENARY, list.filter(j => j.f === "plenary")]].filter(g => g[1].length).sort((a, b) => b[1].length - a[1].length || 0)
+      : ["need", "work", "wait", "stop", "done"].map(k => [{ name: STL[k], accent: "#16181D" }, list.filter(j => j.col === k)]).filter(g => g[1].length);
     return `${header("Work", "What every firm is doing. Tap one to go deeper.")}
     <div class="wsum"><div><b>${c("work")}</b><small>working</small></div><div><b class="n">${c("need")}</b><small>need you</small></div><div><b>${c("wait")}</b><small>waiting</small></div><div><b>${c("done")}</b><small>done</small></div></div>
-    <div class="routes" style="margin-bottom:14px"><button class="chip" data-wby="firm" aria-pressed="${by === "firm"}">By firm</button><button class="chip" data-wby="status" aria-pressed="${by === "status"}">By status</button></div>
-    ${groups.map(([g, l]) => `<section class="wgroup"><h2><i style="background:${g.accent === "#FFFFFF" ? "#16181D" : g.accent}"></i>${esc(g.name)} · ${l.length}</h2>${l.map(row).join("")}</section>`).join("")}`;
+    <div class="routes" style="margin-bottom:14px"><button class="chip" data-wby="firm" aria-pressed="${by === "firm"}">By firm</button><button class="chip" data-wby="status" aria-pressed="${by === "status"}">By status</button>${live ? `<span class="wsp"></span><button class="chip" data-warch="1" aria-pressed="${S.arch}">Archived · ${ajobs.length}</button><button class="chip" data-wmode="1" aria-pressed="${S.wmode}">${S.wmode ? "Cancel" : "Select"}</button>` : ""}</div>
+    ${S.wmode ? `<div class="wbar" role="toolbar"><b>${S.wsel.size} selected</b><button data-wall="1">${S.wsel.size === list.length ? "Clear" : "Select all"}</button><span class="wsp"></span><button data-wact="stop" ${[...S.wsel].some(i => { const q = jobOf(i); return q && LIVE(q); }) ? "" : "disabled"}>Stop</button><button data-wact="${S.arch ? "unarchive" : "archive"}" ${S.wsel.size ? "" : "disabled"}>${S.arch ? "Unarchive" : "Archive"}</button><button class="danger" data-wact="delete" ${S.wsel.size ? "" : "disabled"}>Delete</button></div>` : ""}
+    ${S.arch && !list.length ? `<p class="sub">Nothing archived.</p>` : ""}${groups.map(([g, l]) => `<section class="wgroup"><h2><i style="background:${g.accent === "#FFFFFF" ? "#16181D" : g.accent}"></i>${esc(g.name)} · ${l.length}</h2>${l.map(row).join("")}</section>`).join("")}`;
   }
   function ring(p, ac) { const r = 42, c = 2 * Math.PI * r; return `<svg class="ring" viewBox="0 0 100 100" role="img" aria-label="${Math.round(p * 100)} percent complete"><circle cx="50" cy="50" r="${r}" fill="none" stroke="#E3DFD6" stroke-width="10"/><circle cx="50" cy="50" r="${r}" fill="none" stroke="${ac}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c * p} ${c}" transform="rotate(-90 50 50)"/><text x="50" y="55" text-anchor="middle" font-size="22" font-weight="700" fill="#16181D">${Math.round(p * 100)}%</text></svg>`; }
   function workDetail(j) {
@@ -190,12 +194,12 @@
     const card = cards.find(c => c.job === j.id);
     return `<div class="crumbs"><button data-wback="1">Work</button> / ${esc(j.t)}</div>
     <div class="wdet" style="--a:${ac}">
-      <div class="whead"><div><span class="st ${j.col}">${STL[j.col]}</span><h1>${esc(j.t)}</h1><p class="sub">${esc(f.name)}${j.col !== "done" && j.col !== "wait" ? " · now: " + esc(d.now.nm) : ""}${jcost(j) ? ` · spent <b>${jc(j)}</b> so far` : ""}</p></div>${ring(j.p, ac)}</div>
+      <div class="whead"><div><span class="st ${j.col}">${STL[j.col]}</span>${live && LIVE(j) ? `<button class="wstop" data-wstop="${j.id}">Stop work</button>` : ""}<h1>${esc(j.t)}</h1><p class="sub">${esc(f.name)}${j.col !== "done" && j.col !== "wait" && j.col !== "stop" ? " · now: " + esc(d.now.nm) : ""}${jcost(j) ? ` · spent <b>${jc(j)}</b> so far` : ""}</p></div>${ring(j.p, ac)}</div>
       ${card ? `<button class="needbar" data-goneeds="1"><b>${esc(card.agent)} is waiting for you</b><span>${esc(card.q)}</span><em>Answer →</em></button>` : ""}
       <h2>Progress</h2>
       <ol class="steps">${d.stages.map((s, i) => `<li class="${s.st}"><i>${s.st === "done" ? "✓" : i + 1}</i><span>${esc(s.nm)}</span></li>`).join("")}</ol>
       <div class="wcols">
-        <div><h2>Who is working</h2>${j.col === "done" ? `<p class="sub">Everyone has finished.</p>` : j.col === "wait" ? `<p class="sub">Nobody yet. It starts when a desk is free.</p>` : who.map(w => `<button class="desk" ${w.id ? `data-openagent="${w.f.id}/${w.id}"` : ""}>${pawn(w.f, w.name, "working")}<div><b>${esc(w.name)}</b><small class="state-work">${esc(d.now.nm)}</small></div></button>`).join("")}</div>
+        <div><h2>Who is working</h2>${j.col === "done" ? `<p class="sub">Everyone has finished.</p>` : j.col === "stop" ? `<p class="sub">You stopped this work.</p>` : j.col === "wait" ? `<p class="sub">Nobody yet. It starts when a desk is free.</p>` : who.map(w => `<button class="desk" ${w.id ? `data-openagent="${w.f.id}/${w.id}"` : ""}>${pawn(w.f, w.name, "working")}<div><b>${esc(w.name)}</b><small class="state-work">${esc(d.now.nm)}</small></div></button>`).join("")}</div>
         <div><h2>Who did the most</h2>${d.people.length ? d.people.map(([n, v]) => `<div class="hb"><span>${esc(n)}</span><div><i style="width:${v / max * 100}%"></i></div><b>${v}</b></div>`).join("") : `<p class="sub">Nothing yet.</p>`}</div>
       </div>
       <h2>Step by step</h2>
@@ -481,7 +485,14 @@
     else if (t.dataset.back) { if (t.dataset.back === "b") S.firm = null; S.agent = null; render(); }
     else if (t.dataset.showall) { S.showAll = true; render(); }
     else if (t.dataset.goneeds) { S.tab = "needs"; render(); }
-    else if (t.dataset.work) { S.work = +t.dataset.work; S.open = new Set([S.work + ":" + detail(jobs.find(j => j.id === S.work)).cur]); render(); $("#main").scrollTop = 0; }
+    else if (t.dataset.wmode) { S.wmode = !S.wmode; S.wsel = new Set(); render(); }
+    else if (t.dataset.warch) { S.arch = !S.arch; S.wsel = new Set(); render(); }
+    else if (t.dataset.wpick) { const i = +t.dataset.wpick; S.wsel.has(i) ? S.wsel.delete(i) : S.wsel.add(i); render(); }
+    else if (t.dataset.wall) { const l = S.arch ? ajobs : jobs; S.wsel = S.wsel.size === l.length ? new Set() : new Set(l.map(j => j.id)); render(); }
+    else if (t.dataset.wstop) { jobsAct([+t.dataset.wstop], "stop"); }
+    else if (t.dataset.wact) { jobsAct([...S.wsel], t.dataset.wact); }
+    else if (t.dataset.work && S.wmode) { const i = +t.dataset.work; S.wsel.has(i) ? S.wsel.delete(i) : S.wsel.add(i); render(); }
+    else if (t.dataset.work) { S.work = +t.dataset.work; S.open = new Set([S.work + ":" + detail(jobOf(S.work)).cur]); render(); $("#main").scrollTop = 0; }
     else if (t.dataset.sdef) { stds.forEach(s => s.def = s.id === t.dataset.sdef ? 1 : 0); keep(); }
     else if (t.dataset.libby) { S.lib = t.dataset.libby; render(); }
     else if (t.dataset.fmtopen) { S.fmtOpen = S.fmtOpen === t.dataset.fmtopen ? null : t.dataset.fmtopen; S.fmtSel.clear(); keep(); }
@@ -543,21 +554,35 @@
   document.addEventListener("keydown", e => { if (e.key === "Escape" && S.pv) pvClose(); });
 
   /* LIVE ENGINE: used when the page is served by server/app.py */
-  const COL = { waiting: "wait", working: "work", asking: "need", done: "done" };
+  const COL = { waiting: "wait", working: "work", asking: "need", done: "done", stopped: "stop" };
   const post = (u, b) => fetch(u, { method: "POST", body: JSON.stringify(b) });
   const getj = u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.json(); });
   const when = t => new Date(t * 1000).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  async function jobsAct(ids, action) {
+    if (!ids.length) return;
+    const n = ids.length, w = n === 1 ? "this demand" : n + " demands";
+    const msg = { stop: `Stop work on ${w}? Files already made stay in the Library.`, delete: `Delete ${w} and ${n === 1 ? "its" : "their"} files? This cannot be undone.` }[action];
+    if (msg && !confirm(msg)) return;
+    const r = await post("/api/jobs/bulk", { ids, action }).catch(() => null);
+    if (!r || !r.ok) { toast("That did not work. Try again."); return; }
+    toast({ stop: "Stopped", archive: "Archived", unarchive: "Restored", delete: "Deleted" }[action]);
+    if (action !== "stop") S.wsel = new Set();
+    if (action === "delete" && ids.includes(S.work)) S.work = null;
+    if (action === "stop") S.wsel = new Set();
+    sig = ""; await pull(); render();
+  }
   async function pull() {
     let js, cs, lb;
     try { [js, cs, lb] = await Promise.all([getj("/api/jobs"), getj("/api/cards"), getj("/api/library")]); } catch (e) { return; }
     const docOf = job => (lb.docs.find(d => d.job === job) || {}).id;
-    jobs = js.map(j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, live: 1 }));
+    const mapJ = j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, live: 1 });
+    jobs = js.filter(j => !j.archived).map(mapJ); ajobs = js.filter(j => j.archived).map(mapJ);
     cards = cs.map(c => { const p = c.payload, f = byId[c.firm]; return { id: "c" + c.id, srv: c.id, job: c.job, firm: c.firm, agent: f ? f.agents[0].name : "Plenary Chair", kind: p.kind, q: p.q, opts: p.opts, why: p.why, def: p.def, fmtDoc: p.q.startsWith("Which formats") ? "d" + docOf(c.job) : undefined }; });
     docs = lb.docs.map(d => ({ id: "d" + d.id, job: d.job, name: d.name, type: d.kind, why: d.why || "Produced for this demand.", by: agName(d.by), ver: d.version, fmts: JSON.parse(d.formats || "[]"), st: "final", at: when(d.created) }));
     if (lb.design_systems.length) stds = lb.design_systems.map(s => ({ id: "s" + s.id, name: s.name, kind: s.kind === "link" ? "Link" : "File", url: s.url, def: s.is_default, scope: "All firms", at: when(s.created) }));
     Object.keys(S.state).forEach(k => { S.state[k] = "idle"; });
     jobs.forEach(j => { const f = byId[j.f]; if (!f || (j.col !== "work" && j.col !== "need")) return; f.agents.slice(0, 4).forEach(a => { S.state[f.id + "/" + a.id] = j.col === "need" ? "asking" : "working"; S.task[f.id + "/" + a.id] = "Working on: " + j.t; }); });
-    const s = JSON.stringify([jobs, cards, docs, stds]);
+    const s = JSON.stringify([jobs, ajobs, cards, docs, stds]);
     if (s === sig) return; sig = s;
     const ae = document.activeElement, typing = ae && /TEXTAREA|INPUT/.test(ae.tagName);
     if (!typing && ["office", "board", "needs", "lib"].includes(S.tab)) keep(); else { updCb(); renderAside(); const b = $("#badge"); b.textContent = cards.length || ""; b.dataset.n = cards.length; }

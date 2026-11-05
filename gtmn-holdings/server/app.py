@@ -8,6 +8,7 @@ import json
 import cost
 import os
 import re
+import shutil
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -74,6 +75,33 @@ EDITABLE = ("summary", "notes", "owns")
 for e in store.rows("SELECT charter, patch FROM charter_edits WHERE id IN (SELECT MAX(id) FROM charter_edits GROUP BY charter)"):
     if e["charter"] in charters:
         charters[e["charter"]].update(json.loads(e["patch"]))
+def job_action(ids, act):
+    n = 0
+    for i in ids:
+        j = store.one("SELECT * FROM jobs WHERE id=?", (i,))
+        if not j:
+            continue
+        n += 1
+        if act in ("stop", "archive", "delete") and j["status"] in ("waiting", "working", "asking"):
+            store.run("UPDATE jobs SET status='stopped' WHERE id=?", (i,))
+            for c in store.rows("SELECT id FROM cards WHERE job=? AND state='open'", (i,)):
+                store.run("UPDATE cards SET state='dismissed' WHERE id=?", (c["id"],))
+                ev = getattr(runner, "waiting", {}).get(c["id"])
+                if ev:
+                    ev.set()
+            store.event("stopped", "Stopped by Rafael", i, j["firm"])
+        if act == "archive":
+            store.run("UPDATE jobs SET archived=1 WHERE id=?", (i,))
+        elif act == "unarchive":
+            store.run("UPDATE jobs SET archived=0 WHERE id=?", (i,))
+        elif act == "delete":
+            for t in ("events", "cards", "docs", "messages"):
+                store.run(f"DELETE FROM {t} WHERE job=?", (i,))
+            store.run("DELETE FROM jobs WHERE id=?", (i,))
+            shutil.rmtree(DATA / "vault" / f"job-{i}", ignore_errors=True)
+    return n
+
+
 runner = AgentSDKRunner(store, charters, ROOT) if os.environ.get("HOLDINGS_RUNNER") == "sdk" else SimulatedRunner(store, charters)
 
 
@@ -270,6 +298,12 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, do_backup())
             except Exception as e:
                 return self.send(500, {"error": f"backup failed: {type(e).__name__}"})
+        if p == "/api/jobs/bulk":
+            ids = [int(i) for i in b.get("ids", []) if str(i).isdigit()][:200]
+            act = b.get("action")
+            if act not in ("stop", "archive", "unarchive", "delete") or not ids:
+                return self.send(400, {"error": "bad request"})
+            return self.send(200, {"ok": True, "n": job_action(ids, act)})
         m = re.fullmatch(r"/api/jobs/(\d+)/steer", p)
         if m:
             text = str(b.get("text", "")).strip()[:2000]

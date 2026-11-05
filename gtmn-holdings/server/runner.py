@@ -317,8 +317,8 @@ class AgentSDKRunner(Runner):
             vault.mkdir(parents=True, exist_ok=True)
             (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Blind positions\n\n{positions}\n\n---\n## Verification ({verdict})\n\n{ver}\n\n## Sources consulted\n\n" + "\n".join(f"- {v}: {k}" for k, v in sources.items()) + "\n")
             fmts = j["formats"]
-            s.run("UPDATE jobs SET status='done', progress=1, stage=3 WHERE id=?", (job_id,))
             self._deliver(job_id, firm, title, memo, verdict, "cto-desk", json.loads(fmts))
+            s.run("UPDATE jobs SET status='done', progress=1, stage=3 WHERE id=?", (job_id,))
             s.event("done", "Memo is in the vault and the Library.", job_id, firm)
         except Exception as e:
             s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))

@@ -2,6 +2,7 @@
 compact form: Chair convenes the minimum firms, blind positions in parallel, one issues
 list, one cross-examination turn, Rafael decides what stays open, a verified decision memo.
 The Chair never takes a view on substance; firm text is filed verbatim."""
+import granola
 import json
 import re
 import threading
@@ -91,10 +92,18 @@ def run(r, job_id):
         r._stage(job_id, firm, 1, 5, "Round one: every seat files a blind position")
         sources, env = {}, {}
         facts = f"Mandate as stated by Rafael: {title}"
+        if granola.enabled() and (s.one("SELECT granola FROM jobs WHERE id=?", (job_id,)) or {}).get("granola", 1):
+            r._stage(job_id, firm, 1, 5, "Desk is reading Rafael's meeting notes")
+            brief = say("You are the research clerk of the desk. Use meeting_search and meeting_read to find Rafael's own meetings that bear on the mandate (try several keyword sets; read the most relevant notes, with transcript only if the summary lacks the detail). "
+                        "Write a MEETING BRIEF in plain bullets: the concrete facts, figures, decisions, commitments and disputes, each tagged with the meeting title and date. Report only what you read. If nothing relevant exists, write exactly NO RELEVANT MEETINGS. Under 500 words.",
+                        f"Mandate: {title}", 1800, True, None, job_id, "Meeting clerk")
+            if brief and "NO RELEVANT MEETINGS" not in brief:
+                facts += "\n\nMEETING BRIEF (Rafael's own meeting notes; treat as primary evidence supplied by Rafael, not as unverified):\n" + brief
+                s.event("step", "Meeting brief filed to the fact ledger", job_id, firm)
 
         def blind(f, sid, nm):
             sysm = (r._persona_at(f, sid) + "\n\nYou are seated at the GTMN Plenary for " + avail[f]["name"] + ". Stay inside your firm's lane: " + ", ".join(avail[f].get("owns", [])) +
-                    ". Use web_search and web_fetch to verify facts you rely on and cite them; mark anything unverified as UNVERIFIED. You see only the mandate and the fact ledger, not the other firms.")
+                    ". Use web_search and web_fetch to verify facts you rely on and cite them; mark anything unverified as UNVERIFIED. You see only the mandate and the fact ledger, not the other firms. If the ledger holds a MEETING BRIEF, build on it: it is real evidence from Rafael's own meetings. Never refuse to give a position because more data would help; give your best position from what exists and list the missing data under NEEDS.")
             env[(f, sid)] = say(sysm, f"{facts}\n\nFile your position in four labelled sections: POSITION (verdict and reasons, from your lane only), NEEDS (what you need from another lane), CONSTRAINTS (what you will not accept), FACTS CHALLENGED. Under 450 words.",
                                    2500, True, sources, job_id, nm)
             (vault / "envelopes" / f"{f}--{sid}.md").write_text(env[(f, sid)])
@@ -198,14 +207,14 @@ def run(r, job_id):
         # 6. Decision memo, one pen (lead firm), dissent preserved; then independent verification
         steer = "\n".join(r.notes.get(job_id, []))
         rec = "\n".join(f"- {i['question']} → Rafael decided: {a}" for i, a in decisions) or "none needed"
-        memo = say(f"You hold the pen for {'the ' + avail[lead]['name'] + ' desk' if single else 'the GTMN Plenary as ' + avail[lead]['name'] + chr(39) + 's orchestrator'}. House style: {avail[lead]['summary'][:350]}. Write a decision memo to Rafael in a senior consulting partner's register. Structure: answer first; what the firms agreed; what Rafael decided; dissent preserved verbatim in each firm's own words, never averaged; remaining open items; next steps. Each section credits the firm. Markdown, under 1100 words.",
+        memo = say(f"You hold the pen for {'the ' + avail[lead]['name'] + ' desk' if single else 'the GTMN Plenary as ' + avail[lead]['name'] + chr(39) + 's orchestrator'}. House style: {avail[lead]['summary'][:350]}. Write a decision memo to Rafael in a senior consulting partner's register. If a MEETING BRIEF is in the record, use its facts and name the meeting. Never open with a refusal: give the best-supported answer from the evidence and show what is missing as caveats. Structure: answer first; what the firms agreed; what Rafael decided; dissent preserved verbatim in each firm's own words, never averaged; remaining open items; next steps. Each section credits the firm. Markdown, under 1100 words.",
                       f"Header rule: the memo starts with the line \"TO: Rafael\" exactly. Do not add a surname or title for him, and do not name any company other than GTMN Holdings and the firms listed.\n\nMandate: {title}\n\nFirms: {', '.join(avail[f]['name'] for f in fids)}\n\nPositions, verbatim:\n{v1}\n\nCross-examination:\n{v2}\n\nIssue status: {json.dumps(st)}\n\nRafael's decisions:\n{rec}\n\nStill open, not asked: {json.dumps(left)}\n\nRafael's steering notes (apply them): {steer or 'none'}", 3000)
         ver, verdict = r._verify(job_id, firm, memo, sources)
         (vault / "facts.md").write_text(f"# Fact ledger\n\n- {facts}\n" + "".join(f"- Rafael decided on {i['id']}: {a}\n" for i, a in decisions))
         (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Verification ({verdict})\n\n{ver}\n\n## Sources consulted\n\n" + "\n".join(f"- {v}: {k}" for k, v in sources.items()) + f"\n\n---\n## Plenary file\n\n### Blind positions\n\n{v1}\n\n### Cross-examination\n\n{v2}\n")
         fmts = j["formats"]
-        s.run("UPDATE jobs SET status='done', progress=1, stage=4 WHERE id=?", (job_id,))
         r._deliver(job_id, firm, title, memo, verdict, firm + "-desk", json.loads(fmts))
+        s.run("UPDATE jobs SET status='done', progress=1, stage=4 WHERE id=?", (job_id,))
         s.event("done", f"{'Firm' if single else 'Plenary'} closed with {len(seats)} seats from {len(fids)} firm{'' if single else 's'}. Memo is in the Library.", job_id, firm)
     except Exception as e:
         s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))

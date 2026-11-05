@@ -105,17 +105,16 @@
     });
     const seats = S.convened.map((id, i) => pawn(byId[id], byId[id].name, "working", i * .3)).join("");
     const board = `<button class="room boardroom ${S.convened.length ? "busy" : ""}" style="--a:#fff" data-firm="plenary">
-      <div><h3>Plenary boardroom</h3><div class="role">Orbit Labs · ${S.convened.length} firms in session</div></div>
-      <div class="pawns">${seats}</div><div class="count"><span>Blind positions being written</span><span>Open</span></div></button>`;
+      <div><h3>Plenary boardroom</h3><div class="role">${S.convened.length ? esc(S.mandate) + " · " + S.convened.length + " firms in session" : "No Plenary in session"}</div></div>
+      <div class="pawns">${seats}</div><div class="count"><span>${S.convened.length ? "Plenary at work" : "Empty"}</span><span>Open</span></div></button>`;
     const order = [board, ...rooms];
     return `${header("The building", "Every firm, live. Tap a room to look inside.")}<div class="building">${order.join("")}</div>`;
   }
   function firmView() {
     if (S.firm === "plenary") {
       return `<div class="crumbs"><button data-back="b">The building</button> / Plenary</div>
-      <div class="firmhead" style="--a:#16181D"><i></i><div><h1>Plenary boardroom</h1><p class="sub">Orbit Labs · ${S.convened.length} firms at the table</p></div></div>
-      <h2>At the table</h2><div class="desks">${S.convened.map(id => `<div class="desk"><span class="pawn working" style="--a:${byId[id].accent}">${initials(byId[id].name)}</span><div><b>${esc(byId[id].name)}</b><small class="state-work">writing blind position</small></div></div>`).join("")}</div>
-      <h2 class="group">Steps</h2><div class="desks">${["Fact ledger", "Blind positions", "Single text", "Cross-examination", "Decision memo"].map((s, i) => `<div class="desk ${i > 1 ? "idle" : ""}"><div><b>${i + 1}. ${s}</b><small>${i === 0 ? "done · 23 facts" : i === 1 ? "in progress" : "not started"}</small></div></div>`).join("")}</div>`;
+      <div class="firmhead" style="--a:#16181D"><i></i><div><h1>Plenary boardroom</h1><p class="sub">${S.convened.length ? esc(S.mandate) + " · " + S.convened.length + " firms at the table" : "No Plenary in session"}</p></div></div>
+      ${S.convened.length ? `<h2>At the table</h2><div class="desks">${S.convened.map(id => `<div class="desk"><span class="pawn working" style="--a:${byId[id].accent}">${initials(byId[id].name)}</span><div><b>${esc(byId[id].name)}</b><small class="state-work">in session</small></div></div>`).join("")}</div>` : `<p class="sub">Nobody sits here until a Plenary is running on a real demand.</p>`}`;
     }
     const f = byId[S.firm], l = firmAgents(f), act = l.filter(a => a.st !== "idle"), idle = l.filter(a => a.st === "idle");
     const card = a => `<button class="desk ${a.st === "idle" ? "idle" : ""}" data-agent="${a.id}">${pawn(f, a.name, a.st === "idle" ? "idle" : a.st === "asking" ? "working asking" : "working")}<div><b>${esc(a.name)}</b><small class="${a.st === "asking" ? "state-ask" : a.st === "working" ? "state-work" : ""}">${a.st === "asking" ? "asking you" : a.st === "working" ? "working" : "on the bench"}</small></div></button>`;
@@ -576,7 +575,9 @@
     try { [js, cs, lb] = await Promise.all([getj("/api/jobs"), getj("/api/cards"), getj("/api/library")]); } catch (e) { return; }
     const docOf = job => (lb.docs.find(d => d.job === job) || {}).id;
     const mapJ = j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, live: 1 });
-    S.convened = [...new Set(js.filter(j => !j.archived).flatMap(j => j.convened || []))].filter(id => byId[id]);
+    const sess = js.filter(j => !j.archived && (j.convened || []).length);
+    S.convened = [...new Set(sess.flatMap(j => j.convened))].filter(id => byId[id]);
+    S.mandate = sess.map(j => j.title).join(" · ");
     jobs = js.filter(j => !j.archived).map(mapJ); ajobs = js.filter(j => j.archived).map(mapJ);
     cards = cs.map(c => { const p = c.payload, f = byId[c.firm]; return { id: "c" + c.id, srv: c.id, job: c.job, firm: c.firm, agent: f ? f.agents[0].name : "Plenary Chair", kind: p.kind, q: p.q, opts: p.opts, why: p.why, def: p.def, fmtDoc: p.q.startsWith("Which formats") ? "d" + docOf(c.job) : undefined }; });
     docs = lb.docs.map(d => ({ id: "d" + d.id, job: d.job, name: d.name, type: d.kind, why: d.why || "Produced for this demand.", by: agName(d.by), ver: d.version, fmts: JSON.parse(d.formats || "[]"), st: "final", at: when(d.created) }));

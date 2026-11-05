@@ -15,7 +15,7 @@
     "marketing-house": { fl: ["carpet", "#f6e7d4", "#ecd7bd"], wall: "#fff3e6", trim: "#EA580C", desk: ["#fffaf2", "#d9c3a5"], chair: "#EA580C", acc: "roll", deco: ["board", "frame", "neon", "board"], lounge: [["bean", 10, 204, "#EA580C"], ["bean", 34, 210, "#0EA5E9"], ["plant", 150, 196]], rug: ["#EA580C", "#fde68a"] },
     dani: { fl: ["wood", "#c49a6c", "#b58b5c"], wall: "#4a2c4a", trim: "#C026D3", desk: ["#e8c9a0", "#c3a27a"], chair: "#C026D3", acc: "mug", deco: ["shelf", "frame", "window", "shelf"], lounge: [["sofa", 8, 200, "#C026D3"], ["plant", 150, 196]], rug: ["#C026D3", "#f5d0fe"] }
   };
-  TH.shared = { fl: ["carpet", "#d6d8de", "#caccd4"], wall: "#2a2f3a", trim: "#c9a24a", desk: ["#e4e6ea", "#b4b8c2"], chair: "#2a2f3a", acc: "mug", deco: ["board", "clock", "window", "board"], lounge: [["sofa", 8, 200, "#475569"], ["plant", 150, 196]], rug: ["#2a2f3a", "#c9a24a"] };
+  TH.shared = { fl: ["wood", "#d8b98a", "#cba97a"], wall: "#f4f1ea", trim: "#0EA5A4", desk: ["#f7f3ea", "#c9bda5"], chair: "#0EA5A4", acc: "mug", deco: ["board", "window", "frame", "window"], lounge: [["bean", 10, 204, "#F59E0B"], ["bean", 34, 210, "#0EA5A4"], ["plant", 150, 196]], rug: ["#0EA5A4", "#fde68a"] };
   const MIN_AGENTS = 10;
   const PARTNERS = new Set("ah-bamford ah-lemann ah-schwarzman bp-sahlman cio-brunel cio-marks cio-swensen dgib-cohen dgib-rohatyn dgib-wasserstein managing-partner mh-pollard ogc-eizirik ogc-laster ogc-lipton ogc-white spc-moritz spc-neumann spc-thiel spc-wilson cto-larson dani".split(" "));
   const DECO_X = [6, 38, 142, 174];
@@ -279,7 +279,7 @@
     const tag = f => f.agents.map(a => ({ ...a, fid: f.id, accent: f.accent }));
     const small = api.firms.filter(f => f.agents.length < MIN_AGENTS).sort((a, b) => a.agents.length - b.agents.length);
     const offices = api.firms.filter(f => f.agents.length >= MIN_AGENTS).map(f => ({ ...f, agents: tag(f), fids: [f.id] }));
-    if (small.length) offices.push({ id: "shared", name: "Shared office", accent: "#475569", agents: small.flatMap(tag), fids: small.map(f => f.id), shared: 1 });
+    if (small.length) offices.push({ id: "shared", name: "Shared office", accent: "#0EA5A4", agents: small.flatMap(tag), fids: small.map(f => f.id), shared: 1 });
     const rooms = {};
 
     /* ----- room construction ----- */

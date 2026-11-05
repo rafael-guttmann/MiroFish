@@ -309,7 +309,7 @@ class AgentSDKRunner(Runner):
 
     def _say(self, system, user, max_tokens=1800, tools=False, sources=None, job_id=None, who="", deep=False):
         msgs = [{"role": "user", "content": user}]
-        use_g = bool(tools and not deep and granola.enabled() and (not job_id or (self.s.one("SELECT granola FROM jobs WHERE id=?", (job_id,)) or {}).get("granola", 1)))
+        use_g = bool(tools and not deep and who != "Dani" and granola.enabled() and (not job_id or (self.s.one("SELECT granola FROM jobs WHERE id=?", (job_id,)) or {}).get("granola", 1)))
         if use_g:
             system += ("\nYou can search Rafael's own meeting notes with meeting_search and meeting_read. Use them once or twice for prior decisions, "
                        "commitments or counterparties that bear on the mandate; quote only what you read, and never send meeting content into web searches.")

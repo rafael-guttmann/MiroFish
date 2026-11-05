@@ -103,20 +103,17 @@
         <div class="pawns">${shown.map((a, i) => pawn(f, a.name, a.st === "idle" ? "idle" : a.st === "asking" ? "working asking" : "working", (i % 5) * .25)).join("")}${rest > 0 ? `<span class="bench">+${rest}</span>` : ""}</div>
         <div class="count"><span>${c.work ? `${c.work} of ${c.n} working` : `${c.n} on the bench`}</span>${c.ask ? `<span>${c.ask} asking</span>` : "<span></span>"}</div></button>`;
     });
-    const tables = (S.sess || []).length ? S.sess : [null];
-    const boards = tables.map(x => {
-      const ids = x ? x.firms : [];
-      return `<button class="room boardroom ${ids.length ? "busy" : ""}" style="--a:#fff" data-firm="plenary">
-      <div><h3>Plenary boardroom</h3><div class="role">${x ? esc(x.title) + " · " + ids.length + " firms in session" : "No Plenary in session"}</div></div>
-      <div class="pawns">${ids.map((id, i) => pawn(byId[id], byId[id].name, "working", i * .3)).join("")}</div><div class="count"><span>${x ? "Plenary at work" : "Empty"}</span><span>Open</span></div></button>`;
-    });
-    const order = [...boards, ...rooms];
+    const ns = (S.sess || []).length;
+    const board = `<button class="room boardroom ${ns ? "busy" : ""}" style="--a:#fff" data-firm="plenary">
+      <div><h3>Plenary boardroom</h3><div class="role">${ns ? ns + (ns === 1 ? " office" : " offices") + " in session · " + S.convened.length + " firms" : "No Plenary in session"}</div></div>
+      <div class="pawns">${S.convened.map((id, i) => pawn(byId[id], byId[id].name, "working", i * .3)).join("")}</div><div class="count"><span>${ns ? S.sess.map(x => esc(x.title)).join(" · ").slice(0, 80) : "Empty"}</span><span>Open</span></div></button>`;
+    const order = [board, ...rooms];
     return `${header("The building", "Every firm, live. Tap a room to look inside.")}<div class="building">${order.join("")}</div>`;
   }
   function firmView() {
     if (S.firm === "plenary") {
       return `<div class="crumbs"><button data-back="b">The building</button> / Plenary</div>
-      <div class="firmhead" style="--a:#16181D"><i></i><div><h1>Plenary boardroom</h1><p class="sub">${(S.sess || []).length ? S.sess.length + (S.sess.length === 1 ? " Plenary" : " Plenaries") + " in session" : "No Plenary in session"}</p></div></div>
+      <div class="firmhead" style="--a:#16181D"><i></i><div><h1>Plenary boardroom</h1><p class="sub">${(S.sess || []).length ? S.sess.length + (S.sess.length === 1 ? " office" : " offices") + " in session" : "No Plenary in session"}</p></div></div>
       ${(S.sess || []).length ? S.sess.map(x => `<h2>${esc(x.title)}</h2><div class="desks">${x.firms.map(id => `<div class="desk"><span class="pawn working" style="--a:${byId[id].accent}">${initials(byId[id].name)}</span><div><b>${esc(byId[id].name)}</b><small class="state-work">in session</small></div></div>`).join("")}</div>`).join("") : `<p class="sub">Nobody sits here until a Plenary is running on a real demand.</p>`}`;
     }
     const f = byId[S.firm], l = firmAgents(f), act = l.filter(a => a.st !== "idle"), idle = l.filter(a => a.st === "idle");

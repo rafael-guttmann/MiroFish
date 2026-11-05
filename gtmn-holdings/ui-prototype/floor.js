@@ -126,7 +126,6 @@
   }
   function paintBoardBg() {
     floorTiles(BOARD_TH, 0, 3, 20, 14); wallBase(BOARD_TH);
-    rr(56, 78, 208, 98, 12, "rgba(0,0,0,.3)"); rr(58, 80, 204, 94, 11, "#3a1017"); g.strokeStyle = "#c9a24a"; g.lineWidth = 1; g.beginPath(); g.roundRect(63, 85, 194, 84, 8); g.stroke();
     rr(120, 218, 80, 6, 3, "#7a1f2b");
   }
 
@@ -212,9 +211,10 @@
     if (a.ask) T("!", x + 5.5, y + 1.6, "#c2410c", 6.4, "center", 800);
     else { const n = ((t / 280) | 0) % 3; for (let i = 0; i < 3; i++) ell(x + 2.8 + i * 2.7, y + 4.6, .95, .95, i <= n ? "#16181D" : "#c9ccd3"); }
   }
+  const CHAIRS = [["#22252e", "#3a3f4c"], ["#5a3a1c", "#8a5a2c"], ["#0b2a3a", "#22d3ee"], ["#55704a", "#8fb27e"]];
   function chairShape(s, th) {
     if (s.big) { ell(s.x, s.y + 1, 6.5, 2, "rgba(0,0,0,.25)"); rr(s.x - 6, s.y - 14, 12, 14, 5, "#4a1c24"); rr(s.x - 5, s.y - 13, 10, 4, 2, "#6a2a34"); g.strokeStyle = "#c9a24a"; g.lineWidth = .5; g.beginPath(); g.roundRect(s.x - 5.4, s.y - 13.4, 10.8, 13, 4.4); g.stroke(); }
-    else { ell(s.x, s.y + 1, 5.5, 1.8, "rgba(0,0,0,.22)"); rr(s.x - 5, s.y - 12, 10, 12, 4, "#22252e"); rr(s.x - 4, s.y - 11, 8, 3, 1.6, "#3a3f4c"); }
+    else { const c = CHAIRS[s.th | 0] || CHAIRS[0]; ell(s.x, s.y + 1, 5.5, 1.8, "rgba(0,0,0,.22)"); rr(s.x - 5, s.y - 12, 10, 12, 4, c[0]); rr(s.x - 4, s.y - 11, 8, 3, 1.6, c[1]); }
   }
   function drawDeskShape(r, d, t) {
     const th = r.th, x = d.x, y = d.y;
@@ -247,12 +247,75 @@
     rr(x + 19, y - 2.6, 5, 2.6, 1.3, "#1f7a4a"); R(x + 21.2, y - .4, .8, 3, "#c9a24a");
   }
   function drawChairs(spots) { spots.forEach(s => { if (s.chair) chairShape(s); }); }
-  function drawBoardTable() {
-    ell(162, 132, 84, 28, "rgba(0,0,0,.3)");
-    ell(160, 126, 80, 27, LG(0, 100, 0, 152, ["#7a5030", "#4d2f19", "#3a2312"]));
-    ell(160, 126, 74, 22, "rgba(0,0,0,0)"); g.strokeStyle = "#c9a24a"; g.lineWidth = .7; g.beginPath(); g.ellipse(160, 126, 72, 21, 0, 0, 7); g.stroke();
-    ell(160, 124, 74, 20, "rgba(255,255,255,.05)");
-    pill("GTMN", 160, 121, "#c9a24a", "#2a1c05", 5);
+  const strokeRR = (x, y, w, h, r, c, lw) => { g.strokeStyle = c; g.lineWidth = lw; g.beginPath(); g.roundRect(x, y, w, h, r); g.stroke(); };
+  const strokeEll = (x, y, rx, ry, c, lw) => { g.strokeStyle = c; g.lineWidth = lw; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 7); g.stroke(); };
+  const POD_NAMES = ["Executive", "Round table", "Futuristic", "Zen"];
+  function podRects(n) {
+    const X = 8, Y = 56, WW = 304, HH = 156, G = 8, w = 148, hh = (HH - G) / 2;
+    if (n <= 1) return [{ x: X, y: Y, w: WW, h: HH }];
+    if (n === 2) return [{ x: X, y: Y, w, h: HH }, { x: X + 156, y: Y, w, h: HH }];
+    const top = [{ x: X, y: Y, w, h: hh }, { x: X + 156, y: Y, w, h: hh }];
+    if (n === 3) return [...top, { x: X, y: Y + hh + G, w: WW, h: hh }];
+    return [...top, { x: X, y: Y + hh + G, w, h: hh }, { x: X + 156, y: Y + hh + G, w, h: hh }];
+  }
+  function makePod(rc, th, title, sid, leftSide) {
+    const big = rc.h > 100, cx = rc.x + rc.w / 2, cy = rc.y + rc.h / 2, rx = Math.min(rc.w / 2 - 26, 110), ry = big ? 32 : 15, seats = [], side = leftSide ? rc.x + 5 : rc.x + rc.w - 5;
+    const span = [-.62, 0, .62];
+    for (let j = 0; j < 3; j++) {
+      const u = span[j], e = th === 3 ? 1 : Math.sqrt(1 - u * u), x = Math.round(cx + u * rx);
+      [["d", cy - ry * e - 1], ["u", cy + ry * e + 15]].forEach(([dir, y]) => { y = Math.round(y); seats.push({ x, y, sit: 1, dir, chair: 1, th, out: [{ x, y }, { x: side, y }, { x: side, y: 218 }, { x: 160, y: 218 }] }); });
+    }
+    return { rc, th, title, sid, cx, cy, rx, ry, seats };
+  }
+  const fitTxt = (s, max, sz) => { if (tw(s, sz) <= max) return s; while (s.length > 3 && tw(s + "…", sz) > max) s = s.slice(0, -1); return s + "…"; };
+  function podFloor(p, t) {
+    const { x, y, w, h } = p.rc;
+    g.save(); g.beginPath(); g.roundRect(x, y, w, h, 7); g.clip();
+    if (p.th === 0) { R(x, y, w, h, "#3a1017"); strokeRR(x + 3, y + 3, w - 6, h - 6, 5, "#c9a24a", .8); }
+    else if (p.th === 1) {
+      R(x, y, w, h, "#2c3b24");
+      for (let i = 1; i <= 3; i++) strokeEll(p.cx, p.cy, p.rx + i * 10, p.ry + i * 8, `rgba(201,162,74,${.55 - i * .12})`, .6);
+    } else if (p.th === 2) {
+      R(x, y, w, h, LG(0, y, 0, y + h, ["#050b1a", "#0a1a33"]));
+      for (let gx = x + 6; gx < x + w; gx += 10) R(gx, y, .3, h, "rgba(34,211,238,.12)");
+      for (let gy = y + 4; gy < y + h; gy += 10) R(x, gy, w, .3, "rgba(34,211,238,.12)");
+      R(x, y + ((t / 40) % h), w, .8, "rgba(34,211,238,.2)");
+    } else {
+      R(x, y, w, h, "#e9dfc6");
+      for (let gx = x + 9; gx < x + w; gx += 9) R(gx, y, .4, h, "rgba(120,90,50,.25)");
+      [[x + 9, y + 9], [x + w - 9, y + 9]].forEach(([bx, by]) => { rr(bx - 3, by + 1, 6, 4, 1, "#8a5a3a"); ell(bx, by - 1, 5, 4, "#3f7a46"); ell(bx - 2, by - 3, 3, 2.4, "#5aa35f"); });
+    }
+    g.restore();
+    if (p.th === 1) strokeRR(x + 1, y + 1, w - 2, h - 2, 7, "#6b8a4a", .9);
+    if (p.th === 2) { strokeRR(x + .5, y + .5, w - 1, h - 1, 7, "rgba(34,211,238,.35)", 1.6); strokeRR(x + .5, y + .5, w - 1, h - 1, 7, "#22d3ee", .6); }
+    if (p.th === 3) strokeRR(x + 1, y + 1, w - 2, h - 2, 7, "#9a8458", .9);
+  }
+  function podTable(p, t) {
+    const { cx, cy, rx, ry, th } = p;
+    if (th === 0) {
+      ell(cx + 2, cy + ry * .35, rx + 4, ry + 3, "rgba(0,0,0,.3)");
+      ell(cx, cy, rx, ry, LG(0, cy - ry, 0, cy + ry, ["#7a5030", "#4d2f19", "#3a2312"])); strokeEll(cx, cy, rx - 4, ry - 3, "#c9a24a", .6); ell(cx, cy - ry * .15, rx - 4, ry - 5, "rgba(255,255,255,.05)");
+    } else if (th === 1) {
+      ell(cx + 2, cy + ry * .35, rx + 4, ry + 3, "rgba(0,0,0,.3)");
+      ell(cx, cy, rx, ry, LG(0, cy - ry, 0, cy + ry, ["#c28a4a", "#8a5a2c"]));
+      for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + .39; ln(cx + Math.cos(a) * rx * .5, cy + Math.sin(a) * ry * .5, cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, "rgba(60,35,15,.45)", .5); }
+      strokeEll(cx, cy, rx * .5, ry * .5, "#5a3a1c", .8); ell(cx, cy, rx * .5 - 1, ry * .5 - 1, "#a8743c"); strokeEll(cx, cy, rx - 1.5, ry - 1.2, "#5a3a1c", .7);
+      [0, 2.1, 4.2].forEach((a, i) => { const px = cx + Math.cos(a + .9) * rx * .78, py = cy + Math.sin(a + .9) * ry * .78; rr(px - .8, py - 2, 1.6, 3, .4, "#f4e6c4"); ell(px, py - 3.2, .9 + .25 * Math.sin(t / 130 + i * 2), 1.4, "#ffd36a"); });
+    } else if (th === 2) {
+      ell(cx, cy + 2, rx + 3, ry + 3, "rgba(34,211,238,.14)");
+      ell(cx, cy, rx, ry, "#0b2036"); ell(cx, cy - 1, rx - 3, ry - 3, "#0f3150"); strokeEll(cx, cy, rx - 1.5, ry - 1.2, "#22d3ee", .7);
+      strokeEll(cx, cy, rx * .62, ry * .62, `rgba(103,232,249,${.3 + .3 * Math.sin(t / 400)})`, .7);
+      g.beginPath(); g.moveTo(cx - 7, cy); g.lineTo(cx + 7, cy); g.lineTo(cx, cy - ry - 9); g.closePath(); g.fillStyle = LG(0, cy, 0, cy - ry - 9, ["rgba(34,211,238,.28)", "rgba(34,211,238,0)"]); g.fill();
+      [0, 2.09, 4.19].forEach(a => ell(cx + Math.cos(t / 600 + a) * rx * .72, cy + Math.sin(t / 600 + a) * ry * .72, 1.1, .9, "#67e8f9"));
+    } else {
+      rr(cx - rx + 2, cy - ry + 3, rx * 2, ry * 2, 5, "rgba(0,0,0,.22)");
+      rr(cx - rx, cy - ry, rx * 2, ry * 2, 5, LG(0, cy - ry, 0, cy + ry, ["#d6a96f", "#b08048"])); R(cx - rx + 2, cy - ry + .8, rx * 2 - 4, .7, "rgba(255,255,255,.35)");
+      for (let k = 1; k < 4; k++) R(cx - rx + 3, cy - ry + k * ry * .5, rx * 2 - 6, .3, "rgba(90,60,25,.3)");
+      [cx - rx + 10, cx + rx - 14].forEach(px => { rr(px, cy + ry * .3, 4, 3, 1, "#f6ecd6"); R(px + 1.4, cy + ry * .3 - 1, 1.2, 1, "rgba(140,200,140,.9)"); });
+    }
+    const st = [["#c9a24a", "#2a1c05"], ["#3a2412", "#ffd9a0"], ["#06121f", "#67e8f9"], ["#6b4a2a", "#f6ecd6"]][th];
+    const txt = p.sid ? p.title : "No Plenary in session";
+    pill(fitTxt(txt.toUpperCase(), rx * 1.5, 4.2), cx, cy - 3, st[0], st[1], 4.2);
   }
   function bannersAndLedger(r, t) {
     const ids = r.ids || [];
@@ -302,11 +365,16 @@
       objs.push({ k: 222, d: () => P.plant({ x: 302, y: 204 }) });
       return { id: f.id, firm: f, th, desks, meet, part, idle, objs, agents: new Map(), phase: 0, counts: {} };
     }
-    function makeBoard(id, title, sid) {
-      const seats = [];
-      for (let i = 0; i < 5; i++) { const x = 106 + i * 27; seats.push({ x, y: 98, sit: 1, dir: "d", chair: 1, out: [{ x, y: 98 }, { x: 62, y: 98 }, { x: 62, y: 190 }, { x: 160, y: 190 }] }); }
-      for (let i = 0; i < 5; i++) { const x = 106 + i * 27; seats.push({ x, y: 168, sit: 1, dir: "u", chair: 1, out: [{ x, y: 168 }, { x, y: 190 }, { x: 160, y: 190 }] }); }
-      return { id: id || "plenary", sid, title, firm: { id: "plenary", name: "Plenary boardroom", accent: "#16181D" }, th: BOARD_TH, seats, objs: [], agents: new Map(), isBoard: 1 };
+    function makeBoard() {
+      return { id: "plenary", firm: { id: "plenary", name: "Plenary boardroom", accent: "#16181D" }, th: BOARD_TH, seats: [], pods: [], ids: [], themeOf: new Map(), objs: [], agents: new Map(), isBoard: 1, counts: {} };
+    }
+    function layoutBoard(r, ss) {
+      const live = new Set(ss.map(x => x.id));
+      [...r.themeOf.keys()].forEach(k => { if (!live.has(k)) r.themeOf.delete(k); });
+      ss.forEach(x => { if (!r.themeOf.has(x.id)) { const used = new Set(r.themeOf.values()); r.themeOf.set(x.id, [0, 1, 2, 3].find(i => !used.has(i))); } });
+      const rcs = podRects(Math.max(1, ss.length));
+      r.pods = rcs.map((rc, i) => makePod(rc, ss[i] ? r.themeOf.get(ss[i].id) : 0, ss[i] ? ss[i].title : "", ss[i] ? ss[i].id : null, rc.x + rc.w / 2 < 160 || rc.w > 200));
+      r.seats = r.pods.flatMap(p => p.seats);
     }
 
     /* ----- agents ----- */
@@ -339,14 +407,19 @@
     function sync(r, t) {
       const f = r.firm;
       if (r.isBoard) {
-        const ss = api.sessions().find(x => x.id === r.sid), ids = r.ids = ss ? ss.firms : [];
-        ids.slice(0, 10).forEach((id, i) => {
-          const fm = firmById(id); if (!fm) return; let a = r.agents.get(id);
-          if (!a) { a = newAgent({ id, accent: fm.accent }, { id, name: fm.name }, r.seats[i], { x: 160, y: 236 }); a.st = "working"; r.agents.set(id, a); }
-          a.rep = fm; a.task = "Writing a blind position for the mandate";
-        });
-        [...r.agents.keys()].forEach(id => { if (!ids.includes(id)) r.agents.delete(id); });
-        r.counts = { board: ids.length };
+        const all = api.sessions(), ss = all.slice(0, 4), key = ss.map(x => x.id).join(",");
+        if (key !== r.layoutKey) { r.layoutKey = key; layoutBoard(r, ss); }
+        r.ids = api.convened();
+        const keep = new Set();
+        ss.forEach((x, pi) => x.firms.slice(0, 6).forEach((id, i) => {
+          const fm = firmById(id), seat = r.pods[pi].seats[i], k = x.id + "/" + id; if (!fm) return; keep.add(k);
+          let a = r.agents.get(k);
+          if (!a) { a = newAgent({ id: k, accent: fm.accent }, { id: k, name: fm.name, fid: id }, seat, { x: 160, y: 236 }); a.st = "working"; r.agents.set(k, a); }
+          else if (a.seat !== seat) { if (a.moving) a.pending = seat; else go(a, seat); }
+          a.seat = seat; a.rep = fm; a.task = "Blind position on: " + x.title;
+        }));
+        [...r.agents.keys()].forEach(k => { if (!keep.has(k)) r.agents.delete(k); });
+        r.counts = { board: r.ids.length, sess: ss.length, more: all.length - ss.length };
         return;
       }
       const all = f.agents.map(a => ({ a, st: api.state(a.fid, a.id) }));
@@ -399,15 +472,15 @@
 
     /* ----- drawing ----- */
     function bgFor(r) {
-      if (bgCache[r.isBoard ? "plenary" : r.id]) return bgCache[r.isBoard ? "plenary" : r.id];
+      if (bgCache[r.id]) return bgCache[r.id];
       const c = document.createElement("canvas"); c.width = W * K; c.height = H * K;
       const og = c.getContext("2d"), prev = g; og.scale(K, K); g = og;
       if (r.isBoard) paintBoardBg(); else paintFirmBg(r.firm, r.th);
-      g = prev; bgCache[r.isBoard ? "plenary" : r.id] = c; return c;
+      g = prev; bgCache[r.id] = c; return c;
     }
     function frame(now) {
       const dt = Math.min(.05, (now - last) / 1000); last = now;
-      ensureBoards(); const r = rooms[room]; if (!r) return;
+      const r = rooms[room]; if (!r) return;
       if (now - lastSync > 700) { lastSync = now; sync(r, now); updateHud(r); }
       r.agents.forEach(a => step(a, dt));
       g = main; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W * K, H * K); g.drawImage(bgFor(r), 0, 0); g.setTransform(K, 0, 0, K, 0, 0);
@@ -418,7 +491,7 @@
         
       }
       const list = [];
-      if (r.isBoard) { list.push({ k: 152, d: drawBoardTable }); }
+      if (r.isBoard) { list.push({ k: -2, d: () => r.pods.forEach(p => podFloor(p, t)) }); r.pods.forEach(p => list.push({ k: p.cy, d: () => podTable(p, t) })); }
       else { r.desks.forEach(d => list.push({ k: d.y + 12, d: () => drawDesk(r, d, t) })); list.push(...r.objs); }
       const spots = r.isBoard ? r.seats : [...r.meet, ...r.part];
       list.push({ k: 0, d: () => drawChairs(spots) });
@@ -436,23 +509,13 @@
     /* ----- HUD, chips, resize ----- */
     function updateHud(r) {
       const f = r.firm, c = r.counts, names = ["Kickoff", "Drafting", "Review"];
-      if (r.isBoard) { hud.innerHTML = `<span class="fl-tag" style="--a:#16181D">PLENARY</span><span>${r.sid ? r.title : "No Plenary in session"}</span><span>${c.board} firms at the table</span>`; }
+      if (r.isBoard) { hud.innerHTML = `<span class="fl-tag" style="--a:#16181D">PLENARY</span><span>${c.sess ? c.sess + (c.sess === 1 ? " Plenary" : " Plenaries") : "No Plenary in session"}</span><span>${c.board} firms at the table</span>${c.more ? `<span>+${c.more} waiting for a table</span>` : ""}<span>${r.pods.map(p => POD_NAMES[p.th]).join(" · ")}</span>`; }
       else hud.innerHTML = `<span class="fl-tag" style="--a:${f.accent}">${f.name.toUpperCase()}</span>${f.shared ? `<span>${f.fids.map(i => SHORT[i] || i).join(" + ")}</span>` : ""}<span class="fl-ph">${r.mode}</span><span>MEETING <b>${c.war || 0}</b></span><span>PARTNERS <b>${c.par || 0}</b></span><span>AT PLENARY <b>${c.away || 0}</b></span><span>DESKS <b>${c.desk || 0}</b></span><span>BENCH <b>${c.bench || 0}</b></span>${c.more || c.benchMore ? `<span class="fl-more">+${(c.more || 0) + (c.benchMore || 0)} more off-screen</span>` : ""}`;
       drawRoster(r); drawBar();
     }
     function drawBar() {
       const chip = (id, name, n, a) => `<button class="chip" data-room="${id}" aria-pressed="${room === id}" style="--a:${a}"><i></i>${name}${n ? ` · ${n}` : ""}</button>`;
-      const bs = Object.values(rooms).filter(r => r.isBoard);
-      bar.innerHTML = bs.map(r => chip(r.id, r.sid ? "Plenary · " + r.title.slice(0, 28) : "Boardroom", r.ids ? r.ids.length : 0, "#16181D")).join("") + offices.map(f => chip(f.id, f.name, f.agents.filter(a => api.state(a.fid, a.id) !== "idle").length, f.accent)).join("");
-    }
-    function ensureBoards() {
-      const ss = api.sessions(), want = ss.length ? ss.map(x => "plenary:" + x.id) : ["plenary"];
-      let changed = false;
-      Object.keys(rooms).forEach(k => { if (rooms[k].isBoard && !want.includes(k)) { delete rooms[k]; changed = true; } });
-      ss.forEach(x => { const k = "plenary:" + x.id; if (!rooms[k]) { rooms[k] = makeBoard(k, x.title, x.id); changed = true; } else if (rooms[k].title !== x.title) { rooms[k].title = x.title; changed = true; } });
-      if (!ss.length && !rooms.plenary) { rooms.plenary = makeBoard(); changed = true; }
-      if (!rooms[room]) { room = want[0]; sel = null; tip.hidden = true; lastSync = -1e9; changed = true; }
-      if (changed) drawBar();
+      bar.innerHTML = chip("plenary", "Boardroom", api.convened().length, "#16181D") + offices.map(f => chip(f.id, f.name, f.agents.filter(a => api.state(a.fid, a.id) !== "idle").length, f.accent)).join("");
     }
     function resize() {
       const avail = wrap.clientWidth - 8;
@@ -498,8 +561,8 @@
     bar.addEventListener("click", e => { const b = e.target.closest("[data-room]"); if (!b) return; room = b.dataset.room; sel = null; tip.hidden = true; lastSync = -1e9; drawBar(); });
     window.addEventListener("resize", resize);
 
-    offices.forEach(f => rooms[f.id] = makeFirmRoom(f));
-    ensureBoards();
+    rooms.plenary = makeBoard(); offices.forEach(f => rooms[f.id] = makeFirmRoom(f));
+    if (!rooms[room]) room = "plenary";
     drawBar(); resize(); window.scrollTo(0, 0); raf = requestAnimationFrame(frame);
   }
   window.Floor = { mount };

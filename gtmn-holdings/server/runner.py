@@ -6,6 +6,7 @@ stub until the CTO firm is wired to the Claude Agent SDK.
 """
 import json
 import os
+import granola
 import threading
 import time
 
@@ -233,8 +234,11 @@ class AgentSDKRunner(Runner):
 
     def _say(self, system, user, max_tokens=1800, tools=False, sources=None, job_id=None, who="", deep=False):
         msgs = [{"role": "user", "content": user}]
+        if tools and not deep and granola.enabled():
+            system += ("\nYou can search Rafael's own meeting notes with meeting_search and meeting_read. Use them once or twice for prior decisions, "
+                       "commitments or counterparties that bear on the mandate; quote only what you read, and never send meeting content into web searches.")
         for _ in range(10 if deep else 6):
-            kw = {"tools": (self.DEEP_TOOLS if deep else self.TOOLS)} if tools else {}
+            kw = {"tools": (self.DEEP_TOOLS if deep else self.TOOLS) + (granola.TOOLS if granola.enabled() and not deep else [])} if tools else {}
             r = self.client.beta.messages.create(model=self.model, max_tokens=max_tokens, system=system,
                                                  messages=msgs, betas=["web-fetch-2025-09-10", "code-execution-2025-05-22"], **kw)
             for b in r.content:
@@ -248,9 +252,19 @@ class AgentSDKRunner(Runner):
                         u = getattr(b.content, "url", None)
                         if u:
                             sources[u] = u
+            if r.stop_reason == "tool_use":
+                res = []
+                for b in r.content:
+                    if b.type == "tool_use":
+                        txt, label = granola.run(b.name, b.input)
+                        if job_id:
+                            self.s.event("tool", f"{who} used Granola: {label}", job_id, "granola")
+                        res.append({"type": "tool_result", "tool_use_id": b.id, "content": txt})
+                msgs = msgs + [{"role": "assistant", "content": r.content}, {"role": "user", "content": res}]
+                continue
             if r.stop_reason != "pause_turn":
                 break
-            msgs = [msgs[0], {"role": "assistant", "content": r.content}]
+            msgs = msgs + [{"role": "assistant", "content": r.content}]
         return "".join(b.text for b in r.content if b.type == "text").strip()
 
     def _stage(self, job_id, firm, i, n, label):

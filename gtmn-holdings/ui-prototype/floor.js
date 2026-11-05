@@ -255,7 +255,7 @@
     pill("GTMN", 160, 121, "#c9a24a", "#2a1c05", 5);
   }
   function bannersAndLedger(r, t) {
-    const ids = api0.convened();
+    const ids = r.ids || [];
     ids.slice(0, 6).forEach((id, i) => {
       const fm = api0.byId[id]; if (!fm) return; const bx = i < 3 ? 14 + i * 24 : 240 + (i - 3) * 24;
       g.beginPath(); g.moveTo(bx, 5); g.lineTo(bx + 18, 5); g.lineTo(bx + 18, 36); g.lineTo(bx + 9, 41); g.lineTo(bx, 36); g.closePath(); g.fillStyle = LG(0, 5, 0, 41, [tone(fm.accent, .1), mix(fm.accent, "#000000", .25)]); g.fill();
@@ -302,11 +302,11 @@
       objs.push({ k: 222, d: () => P.plant({ x: 302, y: 204 }) });
       return { id: f.id, firm: f, th, desks, meet, part, idle, objs, agents: new Map(), phase: 0, counts: {} };
     }
-    function makeBoard() {
+    function makeBoard(id, title, sid) {
       const seats = [];
       for (let i = 0; i < 5; i++) { const x = 106 + i * 27; seats.push({ x, y: 98, sit: 1, dir: "d", chair: 1, out: [{ x, y: 98 }, { x: 62, y: 98 }, { x: 62, y: 190 }, { x: 160, y: 190 }] }); }
       for (let i = 0; i < 5; i++) { const x = 106 + i * 27; seats.push({ x, y: 168, sit: 1, dir: "u", chair: 1, out: [{ x, y: 168 }, { x, y: 190 }, { x: 160, y: 190 }] }); }
-      return { id: "plenary", firm: { id: "plenary", name: "Plenary boardroom", accent: "#16181D" }, th: BOARD_TH, seats, objs: [], agents: new Map(), isBoard: 1 };
+      return { id: id || "plenary", sid, title, firm: { id: "plenary", name: "Plenary boardroom", accent: "#16181D" }, th: BOARD_TH, seats, objs: [], agents: new Map(), isBoard: 1 };
     }
 
     /* ----- agents ----- */
@@ -339,7 +339,7 @@
     function sync(r, t) {
       const f = r.firm;
       if (r.isBoard) {
-        const ids = api.convened();
+        const ss = api.sessions().find(x => x.id === r.sid), ids = r.ids = ss ? ss.firms : [];
         ids.slice(0, 10).forEach((id, i) => {
           const fm = firmById(id); if (!fm) return; let a = r.agents.get(id);
           if (!a) { a = newAgent({ id, accent: fm.accent }, { id, name: fm.name }, r.seats[i], { x: 160, y: 236 }); a.st = "working"; r.agents.set(id, a); }
@@ -399,15 +399,15 @@
 
     /* ----- drawing ----- */
     function bgFor(r) {
-      if (bgCache[r.id]) return bgCache[r.id];
+      if (bgCache[r.isBoard ? "plenary" : r.id]) return bgCache[r.isBoard ? "plenary" : r.id];
       const c = document.createElement("canvas"); c.width = W * K; c.height = H * K;
       const og = c.getContext("2d"), prev = g; og.scale(K, K); g = og;
       if (r.isBoard) paintBoardBg(); else paintFirmBg(r.firm, r.th);
-      g = prev; bgCache[r.id] = c; return c;
+      g = prev; bgCache[r.isBoard ? "plenary" : r.id] = c; return c;
     }
     function frame(now) {
       const dt = Math.min(.05, (now - last) / 1000); last = now;
-      const r = rooms[room]; if (!r) return;
+      ensureBoards(); const r = rooms[room]; if (!r) return;
       if (now - lastSync > 700) { lastSync = now; sync(r, now); updateHud(r); }
       r.agents.forEach(a => step(a, dt));
       g = main; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W * K, H * K); g.drawImage(bgFor(r), 0, 0); g.setTransform(K, 0, 0, K, 0, 0);
@@ -436,13 +436,23 @@
     /* ----- HUD, chips, resize ----- */
     function updateHud(r) {
       const f = r.firm, c = r.counts, names = ["Kickoff", "Drafting", "Review"];
-      if (r.isBoard) { hud.innerHTML = `<span class="fl-tag" style="--a:#16181D">PLENARY</span><span>${c.board} firms at the table</span><span>one fact ledger · blind positions</span>`; }
+      if (r.isBoard) { hud.innerHTML = `<span class="fl-tag" style="--a:#16181D">PLENARY</span><span>${r.sid ? r.title : "No Plenary in session"}</span><span>${c.board} firms at the table</span>`; }
       else hud.innerHTML = `<span class="fl-tag" style="--a:${f.accent}">${f.name.toUpperCase()}</span>${f.shared ? `<span>${f.fids.map(i => SHORT[i] || i).join(" + ")}</span>` : ""}<span class="fl-ph">${r.mode}</span><span>MEETING <b>${c.war || 0}</b></span><span>PARTNERS <b>${c.par || 0}</b></span><span>AT PLENARY <b>${c.away || 0}</b></span><span>DESKS <b>${c.desk || 0}</b></span><span>BENCH <b>${c.bench || 0}</b></span>${c.more || c.benchMore ? `<span class="fl-more">+${(c.more || 0) + (c.benchMore || 0)} more off-screen</span>` : ""}`;
       drawRoster(r); drawBar();
     }
     function drawBar() {
       const chip = (id, name, n, a) => `<button class="chip" data-room="${id}" aria-pressed="${room === id}" style="--a:${a}"><i></i>${name}${n ? ` · ${n}` : ""}</button>`;
-      bar.innerHTML = chip("plenary", "Boardroom", api.convened().length, "#16181D") + offices.map(f => chip(f.id, f.name, f.agents.filter(a => api.state(a.fid, a.id) !== "idle").length, f.accent)).join("");
+      const bs = Object.values(rooms).filter(r => r.isBoard);
+      bar.innerHTML = bs.map(r => chip(r.id, r.sid ? "Plenary · " + r.title.slice(0, 28) : "Boardroom", r.ids ? r.ids.length : 0, "#16181D")).join("") + offices.map(f => chip(f.id, f.name, f.agents.filter(a => api.state(a.fid, a.id) !== "idle").length, f.accent)).join("");
+    }
+    function ensureBoards() {
+      const ss = api.sessions(), want = ss.length ? ss.map(x => "plenary:" + x.id) : ["plenary"];
+      let changed = false;
+      Object.keys(rooms).forEach(k => { if (rooms[k].isBoard && !want.includes(k)) { delete rooms[k]; changed = true; } });
+      ss.forEach(x => { const k = "plenary:" + x.id; if (!rooms[k]) { rooms[k] = makeBoard(k, x.title, x.id); changed = true; } else if (rooms[k].title !== x.title) { rooms[k].title = x.title; changed = true; } });
+      if (!ss.length && !rooms.plenary) { rooms.plenary = makeBoard(); changed = true; }
+      if (!rooms[room]) { room = want[0]; sel = null; tip.hidden = true; lastSync = -1e9; changed = true; }
+      if (changed) drawBar();
     }
     function resize() {
       const avail = wrap.clientWidth - 8;
@@ -488,8 +498,8 @@
     bar.addEventListener("click", e => { const b = e.target.closest("[data-room]"); if (!b) return; room = b.dataset.room; sel = null; tip.hidden = true; lastSync = -1e9; drawBar(); });
     window.addEventListener("resize", resize);
 
-    rooms.plenary = makeBoard(); offices.forEach(f => rooms[f.id] = makeFirmRoom(f));
-    if (!rooms[room]) room = "plenary";
+    offices.forEach(f => rooms[f.id] = makeFirmRoom(f));
+    ensureBoards();
     drawBar(); resize(); window.scrollTo(0, 0); raf = requestAnimationFrame(frame);
   }
   window.Floor = { mount };

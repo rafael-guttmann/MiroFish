@@ -139,7 +139,7 @@
   function floor() { return `${header("The floor", "Watch the firms at work. Tap a room, then tap anyone.")}<div id="floorhost"></div>`; }
   function mountFloor() {
     Floor.mount($("#floorhost"), {
-      firms: FIRMS, byId, convened: () => S.convened,
+      firms: FIRMS, byId, convened: () => S.convened, sessions: () => S.sess || [],
       state: (f, a) => S.state[f + "/" + a], task: (f, a) => S.task[f + "/" + a],
       goNeeds: () => { S.tab = "needs"; render(); },
       openAgent: (f, a) => { S.tab = "office"; S.firm = f; S.agent = a; render(); },

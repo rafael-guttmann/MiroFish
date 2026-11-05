@@ -341,15 +341,28 @@ class AgentSDKRunner(Runner):
             s.event("start", "Dani picked up the demand", job_id, firm)
             raw = (self.root / "firms" / "dani" / "agents" / "dani.md").read_text()
             persona = raw.split("---", 2)[2].strip() if raw.startswith("---") else raw
-            self._stage(job_id, firm, 0, 2, "Dani is thinking it through")
-            memo = self._say(persona + "\nThe corpus of his public words is not loaded in this service, so do not quote him; give his judgment as the persona describes it and say plainly where you are reasoning rather than recalling. Use web_search for facts you rely on; mark anything unverified. Write in Markdown, answer first, under 700 words; refer to Daniel in the third person.",
-                             f"Mandate: {title}\n\nSteering notes: {' '.join(self.notes.get(job_id, [])) or 'none'}", 2200, True, {}, job_id, "Dani")
+            sk = self.root / "firms" / "dani" / "skills" / "dani"
+            ref = (sk / "references" / "persona.md").read_text() if (sk / "references" / "persona.md").exists() else ""
+            self._stage(job_id, firm, 0, 2, "Dani is searching his own words")
+            passages = ""
+            try:
+                qs = json.loads((lambda r: r[r.index("["):r.rindex("]") + 1])(self._say("Reply with a JSON array of 4 short keyword search queries (3 to 7 words each), 2 in English and 2 in German, in the words Daniel Dippold would use, to find what he has said that bears on this mandate.", title, 200, False, None, job_id, "Dani")))
+                import subprocess
+                for q in qs[:4]:
+                    o = subprocess.run(["python3", str(sk / "scripts" / "search.py"), str(q), "--k", "5"], capture_output=True, text=True, timeout=60).stdout
+                    passages += f"\n### Search: {q}\n{o[:6000]}"
+            except Exception:
+                passages = "(search failed; say so and answer as a take)"
+            s.event("step", "Dani searched his corpus", job_id, firm)
+            self._stage(job_id, firm, 1, 3, "Dani is writing his take")
+            memo = self._say(persona + "\n\n" + ref[:14000] + "\n\nGround the answer in the passages below. Quote only words that appear verbatim; keep credits to others; say plainly when something is your take rather than on the record. Use web_search for outside facts; mark anything unverified. Write in Markdown, answer first, under 700 words; refer to Daniel in the third person. Lines marked as previous speaker are not his words. Start directly with the answer: no preamble, no meta-commentary about passages or frameworks."
+                             f"Mandate: {title}\n\nSteering notes: {' '.join(self.notes.get(job_id, [])) or 'none'}\n\nPassages from his public words:\n{passages}", 2400, True, {}, job_id, "Dani")
             vault = Path(os.environ.get("HOLDINGS_DATA") or self.root / "server" / "data") / "vault" / f"job-{job_id}"
             vault.mkdir(parents=True, exist_ok=True)
             (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\nAdvisory second opinion from an AI modelled on Daniel Dippold. Not Daniel, not verified.\n")
-            self._stage(job_id, firm, 1, 2, "Desk is preparing the files")
+            self._stage(job_id, firm, 2, 3, "Desk is preparing the files")
             self._deliver(job_id, firm, title, memo, "advisory, not verified", "dani", json.loads(j["formats"]))
-            s.run("UPDATE jobs SET status='done', progress=1, stage=1 WHERE id=?", (job_id,))
+            s.run("UPDATE jobs SET status='done', progress=1, stage=2 WHERE id=?", (job_id,))
             s.event("done", "Dani's take is in the Library.", job_id, firm)
         except cost.CapStop:
             s.run("UPDATE jobs SET status='waiting' WHERE id=?", (job_id,))

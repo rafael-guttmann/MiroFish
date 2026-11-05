@@ -217,8 +217,23 @@
         <div id="pend" class="pend"></div>
         <div class="comp-bar"><label class="att2"><svg viewBox="0 0 24 24"><path d="M20 11l-8 8a5 5 0 01-7-7l8-8a3.5 3.5 0 015 5l-8 8a2 2 0 01-3-3l7-7"/></svg>Attach file or design system<input type="file" id="sfile" multiple hidden></label><button class="send" id="ssend" disabled>Send</button></div></div></section>`;
   }
+  const tfmt = c => new Date(c * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  function syncThread(j) {
+    if (!(live && j && j.live)) return;
+    getj("/api/jobs/" + j.id + "/thread").then(l => {
+      const m = l.map(x => ({ me: x.role === "me" ? 1 : 0, text: x.text, t: tfmt(x.created) }));
+      if (l.length && l[l.length - 1].role === "me") m.push({ typing: 1, text: "", t: clock() });
+      const k = JSON.stringify(m); if (S.thr_sig && S.thr_sig[j.id] === k) return;
+      (S.thr_sig = S.thr_sig || {})[j.id] = k; S.thread[j.id] = m; if (S.tab === "board" && S.work === j.id) drawThread(j);
+    }).catch(() => {});
+  }
   function steer(j, text, files) {
-    if (live && j.live && text) post("/api/jobs/" + j.id + "/steer", { text }).then(pull);
+    if (live && j.live && text) {
+      post("/api/jobs/" + j.id + "/steer", { text }).then(() => { syncThread(j); pull(); });
+      const t = thr(j); t.push({ me: 1, text, t: clock() }, { typing: 1, text: "", t: clock() }); drawThread(j);
+      say(j.f, fl(j.f).name, "Change request received: " + text.slice(0, 48));
+      return;
+    }
     const t = thr(j), now = clock();
     t.push({ me: 1, text: text || "(file attached)", files, t: now });
     const r = { text: "", typing: 1, t: now }; t.push(r); drawThread(j);
@@ -235,6 +250,7 @@
   function drawThread(j) { const el = $("#thread"); if (!el) return; const t = thr(j); el.innerHTML = t.length ? t.map(m => msgHtml(m, j)).join("") : EMPTY; el.scrollTop = el.scrollHeight; }
   function wireWork() {
     const j = jobs.find(x => x.id === S.work); if (!j) return;
+    syncThread(j);
     const n = $("#snote"), s = $("#ssend"), f = $("#sfile"), p = $("#pend");
     const upd = () => { s.disabled = !(n.value.trim() || S.pend.length); p.innerHTML = S.pend.map((x, i) => `<span class="fchip">${esc(x)} <button data-unpend="${i}" aria-label="Remove">×</button></span>`).join(""); };
     n.oninput = () => { n.style.height = "auto"; n.style.height = Math.max(64, Math.min(140, n.scrollHeight)) + "px"; upd(); };
@@ -476,7 +492,7 @@
     else if (t.dataset.pvsteer) { const jid = +t.dataset.pvsteer; pvClose(); S.tab = "board"; S.work = jid; S.open = new Set([jid + ":" + detail(jobs.find(j => j.id === jid)).cur]); render(); $("#main").scrollTop = 0; }
     else if (t.dataset.dl) { const [id, k] = t.dataset.dl.split(":"); dl(docs.find(x => x.id === id), k); }
     else if (t.dataset.bknow) { toast("Backing up…"); post("/api/backup", {}).then(r => { toast(r && r.name ? "Backup saved: " + r.files + " files" : "Backup failed"); bkLoad(); }); }
-    else if (t.dataset.dlall) { toast("Preparing one zip with every file (sample in this prototype)."); }
+    else if (t.dataset.dlall) { if (live) { toast("Preparing your zip. This can take a moment."); location.href = "/api/docs.zip"; } else toast("Preparing one zip with every file (sample in this prototype).");}
     else if (t.dataset.wback) { S.work = null; render(); }
     else if (t.dataset.wby) { S.workBy = t.dataset.wby; render(); }
     else if (t.dataset.stage) { S.open.has(t.dataset.stage) ? S.open.delete(t.dataset.stage) : S.open.add(t.dataset.stage); const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; }
@@ -552,7 +568,7 @@
       const lb = await getj("/api/library");
       if (!lb.design_systems.length) for (const s of stds) if (s.url) await post("/api/design-systems", { name: s.name, url: s.url });
     } catch (e) {}
-    await pull(); setInterval(pull, 2500);
+    await pull(); setInterval(() => { pull(); if (S.tab === "board") syncThread(jobs.find(x => x.id === S.work)); }, 2500);
     const es = new EventSource("/api/stream");
     es.onmessage = m => { const e = JSON.parse(m.data), id = byId[e.firm] ? e.firm : "plenary"; say(id, fl(id).name, e.text); };
     render();

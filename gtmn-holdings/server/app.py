@@ -162,6 +162,11 @@ class H(BaseHTTPRequestHandler):
                                     "partners": c.get("senior_panel", []), "outputs": c.get("outputs", [])} for c in charters.values()])
         if p == "/api/charters":
             return self.send(200, store.rows("SELECT charter, decision, note, created FROM charter_reviews r WHERE id=(SELECT MAX(id) FROM charter_reviews WHERE charter=r.charter)"))
+        m = re.fullmatch(r"/api/jobs/(\d+)/thread", p)
+        if m:
+            return self.send(200, store.rows("SELECT role, text, created FROM messages WHERE job=? ORDER BY id", (m[1],)))
+        if p == "/api/docs.zip":
+            return self.zipfile(parse_qs(urlparse(self.path).query))
         if p == "/api/cost":
             st = cost.status(store)
             st["by_job"] = store.rows("SELECT job, ROUND(SUM(usd),4) AS usd FROM usage WHERE job IS NOT NULL GROUP BY job ORDER BY job DESC LIMIT 50")
@@ -358,6 +363,47 @@ class H(BaseHTTPRequestHandler):
                 time.sleep(1)
         except (BrokenPipeError, ConnectionResetError):
             pass
+
+    def zipfile(self, q):
+        import io
+        import zipfile
+        jid = (q.get("job") or [None])[0]
+        docs = store.rows("SELECT * FROM docs WHERE job=? ORDER BY id", (jid,)) if jid else store.rows("SELECT * FROM docs ORDER BY job, id")
+        buf, used = io.BytesIO(), set()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for d in docs:
+                vault = DATA / "vault" / f"job-{d['job']}"
+                src = vault / (d.get("src") or "decision-memo.md")
+                if not src.is_file():
+                    continue
+                job = store.one("SELECT title FROM jobs WHERE id=?", (d["job"],)) or {"title": ""}
+                folder = f"{d['job']:03d}-" + (re.sub(r"[^A-Za-z0-9]+", "-", job["title"]).strip("-")[:40] or "job")
+                slug = re.sub(r"[^A-Za-z0-9]+", "-", d["name"]).strip("-")[:60] or "deliverable"
+                for fmt in json.loads(d["formats"] or "[]"):
+                    try:
+                        if fmt == "Markdown":
+                            data, ext = src.read_bytes(), "md"
+                        elif fmt in render.BUILD:
+                            data, ext = render.BUILD[fmt](d["name"], src.read_text()), render.MIME[fmt][1]
+                        else:
+                            continue
+                    except Exception:
+                        continue
+                    path = f"{folder}/{slug}.{ext}"
+                    k = 2
+                    while path in used:
+                        path = f"{folder}/{slug}-{k}.{ext}"
+                        k += 1
+                    used.add(path)
+                    z.writestr(path, data)
+        body = buf.getvalue()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/zip")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f'attachment; filename="gtmn-holdings-{"job-" + jid if jid else "everything"}.zip"')
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(body)
 
     def docfile(self, did, q):
         d = store.one("SELECT * FROM docs WHERE id=?", (did,))

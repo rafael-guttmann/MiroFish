@@ -5,6 +5,7 @@ a question card, and honours steering notes. AgentSDKRunner is the real one and 
 stub until the CTO firm is wired to the Claude Agent SDK.
 """
 import json
+import re
 from pathlib import Path
 import os
 import cost
@@ -37,6 +38,8 @@ class SimulatedRunner(Runner):
     def steer(self, job_id, text, files):
         self.notes.setdefault(job_id, []).append(text)
         j = self.s.one("SELECT * FROM jobs WHERE id=?", (job_id,))
+        self.s.run("INSERT INTO messages(job,role,text,created) VALUES(?,?,?,?)", (job_id, "me", text, time.time()))
+        self.s.run("INSERT INTO messages(job,role,text,created) VALUES(?,?,?,?)", (job_id, "desk", "Noted. This firm is still a simulation, so I will adjust from the next step but cannot rewrite real files.", time.time()))
         self.s.event("steer", f"Desk read your note and adjusts from here: {text[:80]}", job_id, j["firm"])
 
     def card_answered(self, card_id):
@@ -129,7 +132,58 @@ class AgentSDKRunner(Runner):
             return self.sim.steer(job_id, text, files)
         self.notes.setdefault(job_id, []).append(text)
         j = self.s.one("SELECT firm FROM jobs WHERE id=?", (job_id,))
+        self.s.run("INSERT INTO messages(job,role,text,created) VALUES(?,?,?,?)", (job_id, "me", text, time.time()))
         self.s.event("steer", f"Desk will apply your note at the next step: {text[:80]}", job_id, j["firm"])
+        threading.Thread(target=self._steer_reply, args=(job_id, text), daemon=True).start()
+
+    _revlock = threading.Lock()
+    FMT_WORDS = {"Excel": r"excel|spreadsheet", "PowerPoint": r"power ?point|\bppt\b|\bdeck\b", "Word": r"\bword\b|docx", "PDF": r"\bpdf\b", "JPEG": r"jpe?g|image", "Markdown": r"markdown"}
+
+    def _steer_reply(self, job_id, text):
+        """The desk answers Rafael's note. While the run is open, the note is queued for the memo step.
+        Once the run is done, the desk writes a revised version and keeps the earlier one."""
+        s = self.s
+        say = lambda m: s.run("INSERT INTO messages(job,role,text,created) VALUES(?,?,?,?)", (job_id, "desk", m, time.time()))
+        try:
+            j = s.one("SELECT * FROM jobs WHERE id=?", (job_id,))
+            firm = self.charters.get(j["firm"], {}).get("name", j["firm"]) if j["firm"] != "plenary" else "Plenary"
+            vault = Path(os.environ.get("HOLDINGS_DATA") or self.root / "server" / "data") / "vault" / f"job-{job_id}"
+            src = vault / "decision-memo.md"
+            if j["status"] != "done" or not src.is_file():
+                say(self._say(f"You are the {firm} desk at GTMN Holdings, replying to Rafael in the steering thread of a run still in progress. "
+                              "Reply in under 50 words, plain, first person. Say what you will change when the memo is written. Do not invent facts.",
+                              f"Mandate: {j['title']}\nRun status: {j['status']}\nRafael's note: {text}", 300, job_id=job_id, who=f"{firm} desk").strip())
+                return
+            with self._revlock:
+                s.run("UPDATE jobs SET status='working' WHERE id=?", (job_id,))
+                s.event("steer", f"{firm} desk is revising the memo from your note", job_id, j["firm"])
+                last = s.one("SELECT src FROM docs WHERE job=? AND src LIKE 'revision-%' ORDER BY version DESC LIMIT 1", (job_id,))
+                raw = (vault / last["src"]).read_text() if last and (vault / last["src"]).is_file() else src.read_text()
+                body = raw.split("\n\n---\n")[0]
+                body = body.split("\n\n", 1)[1] if body.startswith("# ") and "\n\n" in body else body
+                rev = self._say(f"You are the {firm} desk at GTMN Holdings revising a verified decision memo because Rafael asked for a change. "
+                                "Apply his note. Keep everything he did not ask to change. Do not add new factual claims you cannot support from the memo itself; "
+                                "if the note needs new facts, say so in a line marked 'Needs verification:'. Markdown, same register, answer first. Never mention attachments or file names: the system converts this text into Word, Excel, PDF or slides by itself, so if an Excel or deck is wanted, put the figures in markdown tables (and use '## ' headings for slides).",
+                                f"Current memo:\n\n{body}\n\nRafael's note: {text}", 3000, job_id=job_id, who=f"{firm} desk")
+                prev = s.one("SELECT * FROM docs WHERE job=? ORDER BY id LIMIT 1", (job_id,)) or {}
+                ver = (s.one("SELECT COALESCE(MAX(version),1) AS v FROM docs WHERE job=?", (job_id,)) or {"v": 1})["v"] + 1
+                fn = f"revision-{ver}.md"
+                (vault / fn).write_text(f"# {j['title']} (v{ver})\n\n{rev}\n\n---\nRevised from Rafael's note: {text[:300]}\nThis revision was not re-verified; the earlier verified memo is unchanged.\n")
+                fmts = json.loads(prev.get("formats") or '["PDF"]')
+                for f, rx in self.FMT_WORDS.items():
+                    if re.search(rx, text, re.I) and f not in fmts:
+                        fmts.append(f)
+                s.run("INSERT INTO docs(job,name,kind,by,version,formats,created,src,why) VALUES(?,?,?,?,?,?,?,?,?)",
+                      (job_id, f"{j['title']} (v{ver})", "Revision (changes not re-verified)", prev.get("by") or "desk", ver, json.dumps(fmts), time.time(), fn, f"Your note: {text[:140]}"))
+                s.run("UPDATE jobs SET status='done' WHERE id=?", (job_id,))
+                s.event("deliver", f"Revised memo v{ver} is in the Library", job_id, j["firm"])
+                say(f"Done. I wrote v{ver} with your change and kept the earlier version. It is in the Library as {', '.join(fmts)}. It was not re-verified, so treat new claims with care.")
+        except cost.CapStop:
+            s.run("UPDATE jobs SET status='done' WHERE id=?", (job_id,))
+            say("Stopped at the spending cap before I could finish.")
+        except Exception as e:
+            s.run("UPDATE jobs SET status='done' WHERE id=? AND status='working'", (job_id,))
+            say(f"I could not apply that: {type(e).__name__}. Try again in a moment.")
 
     def card_answered(self, card_id):
         ev = self.waiting.get(card_id)

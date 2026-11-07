@@ -11,6 +11,7 @@ from pathlib import Path
 import os
 import cost
 import granola
+import models
 import threading
 import time
 
@@ -26,6 +27,7 @@ class Runner:
     def start(self, job_id): raise NotImplementedError
     def steer(self, job_id, text, files): raise NotImplementedError
     def card_answered(self, card_id): raise NotImplementedError
+    def available_models(self): return None
 
 
 class SimulatedRunner(Runner):
@@ -104,18 +106,41 @@ class AgentSDKRunner(Runner):
     """
     REAL = {"gtmn-cto", "plenary"}
     SEAT_NAMES = {"cto-majors": "Charity Majors", "cto-willison": "Simon Willison", "cto-larson": "Will Larson"}
+    # Models think before they answer, and thinking counts toward max_tokens. max_tokens is the
+    # length of the visible answer; every call gets this much extra room for thinking.
+    THINK_ROOM = {"low": 2000, "medium": 6000, "high": 12000}
+    _avail = (0.0, None)
+    _avail_lock = threading.Lock()
 
     def __init__(self, store, charters, root):
         import anthropic
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise RuntimeError("ANTHROPIC_API_KEY is not set. Put it in server/.env")
         self.client = anthropic.Anthropic(max_retries=3, timeout=240)
-        self.model = os.environ.get("HOLDINGS_MODEL", "claude-sonnet-5-5")
-        self.pen_model = os.environ.get("HOLDINGS_MODEL_PEN", "claude-opus-5-5")
-        self.verify_model = os.environ.get("HOLDINGS_MODEL_VERIFY", self.pen_model)
         self.s, self.charters, self.root = store, charters, root
         self.sim = SimulatedRunner(store, charters)
         self.notes, self.waiting = {}, {}
+
+    def available_models(self):
+        """{model id: supports effort} for this API key, cached for ten minutes; None if the list cannot be fetched."""
+        with self._avail_lock:
+            expires, found = self._avail
+            if time.time() < expires:
+                return found
+            try:
+                listed = {}
+                for m in self.client.with_options(timeout=15, max_retries=1).models.list(limit=100):
+                    effort = ((m.model_dump(mode="json").get("capabilities") or {}).get("effort") or {}).get("supported")
+                    listed[m.id] = effort
+                self._avail = (time.time() + 600, listed or None)
+            except Exception:
+                self._avail = (time.time() + 60, found)
+            return self._avail[1]
+
+    def model_for(self, job_id, role="work"):
+        """The model for this kind of work on this job: the preset Rafael chose when he filed the demand."""
+        row = self.s.one("SELECT model FROM jobs WHERE id=?", (job_id,)) if job_id else None
+        return models.roles_for(row["model"] if row else None)[role]
 
     def _real(self, job_id):
         j = self.s.one("SELECT firm FROM jobs WHERE id=?", (job_id,))
@@ -171,7 +196,7 @@ class AgentSDKRunner(Runner):
                 rev = self._say(f"You are the {firm} desk at GTMN Holdings revising a verified decision memo because Rafael asked for a change. "
                                 "Apply his note. Keep everything he did not ask to change. Do not add new factual claims you cannot support from the memo itself; "
                                 "if the note needs new facts, say so in a line marked 'Needs verification:'. Markdown, same register, answer first. Never mention attachments or file names: the system converts this text into Word, Excel, PDF or slides by itself, so if an Excel or deck is wanted, put the figures in markdown tables (and use '## ' headings for slides).",
-                                f"Current memo:\n\n{body}\n\nRafael's note: {text}", 3000, job_id=job_id, who=f"{firm} desk")
+                                f"Current memo:\n\n{body}\n\nRafael's note: {text}", 3000, job_id=job_id, who=f"{firm} desk", role="pen")
                 prev = s.one("SELECT * FROM docs WHERE job=? ORDER BY id LIMIT 1", (job_id,)) or {}
                 ver = (s.one("SELECT COALESCE(MAX(version),1) AS v FROM docs WHERE job=?", (job_id,)) or {"v": 1})["v"] + 1
                 fn = f"revision-{ver}.md"
@@ -226,7 +251,7 @@ class AgentSDKRunner(Runner):
         self._stage(job_id, firm, stage, of, "Verifier is checking every claim against primary sources")
         ver = self._say(self.VERIFIER + "\nPrioritize material claims that affect the decision. Skip trivia, generic technology definitions, agent identities, and recommendations. Limit the table to 25 decision-relevant claims.",
                         f"Memo to verify:\n\n{memo}\n\nSources the authors already consulted:\n" + "\n".join(f"- {v} {k}" for k, v in sources.items()),
-                        12000, True, sources, job_id, "Verifier", deep=True, model=self.verify_model,
+                        12000, True, sources, job_id, "Verifier", deep=True, role="verify",
                         effort="medium", include_docs=True)
         bad = flags = 0
         for l in ver.splitlines():
@@ -249,7 +274,7 @@ class AgentSDKRunner(Runner):
                           "For every unverified claim, keep it only if clearly marked as unverified. Never invent replacement figures or facts. "
                           "Change nothing else, keep the structure and the \"TO: Rafael\" header, and return the full corrected memo in Markdown only.",
                           f"Memo:\n\n{memo}\n\nVerifier findings:\n\n{ver}", 12000, False, None, job_id, "Desk",
-                          model=self.pen_model, effort="high")
+                          role="pen", effort="high")
         if len(fixed) < len(memo) * 0.5:
             return memo, ver, verdict
         ver2, verdict2 = self._verify(job_id, firm, fixed, sources, stage, of)
@@ -314,7 +339,7 @@ class AgentSDKRunner(Runner):
         else:
             system += " This deliverable is not Excel: provide computed values only when the source provides sufficient inputs; never show cell formulas."
         edited = self._say(system, f"Deliverable: {title} ({fmt})\n\n{context}\n\nDraft:\n{text}",
-                           12000, job_id=job_id, who="Editor", model=self.pen_model, effort="medium")
+                           12000, job_id=job_id, who="Editor", role="pen", effort="medium")
         return self._clean_title(edited, title)
 
     def _deliver(self, job_id, firm, title, memo, verdict, by, requested):
@@ -331,7 +356,7 @@ class AgentSDKRunner(Runner):
                             "PowerPoint for a committee or board presentation; JPEG for a one-page visual summary; Markdown for notes or hand-over for other tools. Reply with JSON only.",
                             f"Mandate: {title}\n\nVerified memo:\n{memo[:7000]}\n\nReturn {{\"deliverables\": [{{\"name\": short title, \"kind\": e.g. Memo|Model|Deck|Checklist|Summary, "
                             f"\"format\": one of {list(self.DOC_FORMATS)}, \"why\": one sentence on why this format, \"brief\": what it must contain}}]}}",
-                            1800, job_id=job_id, who="Delivery planner", model=self.model, effort="low")
+                            1800, job_id=job_id, who="Delivery planner", effort="low")
             plan = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])["deliverables"]
         except Exception:
             plan = []
@@ -358,7 +383,7 @@ class AgentSDKRunner(Runner):
                     + formula_rule,
                     f"Deliverable: {p['name']} ({p.get('kind', '')})\nPurpose: {p.get('why', '')}\nMust contain: {p.get('brief', '')}\n"
                     f"Format: {fmt}\nVerification status: {verdict}\n\nVerified memo:\n{memo}",
-                    12000, job_id=job_id, who="Delivery writer", model=self.pen_model, effort="high")
+                    12000, job_id=job_id, who="Delivery writer", role="pen", effort="high")
                 draft = self._clean_title(draft, p["name"])
                 out[i] = self._edit_deliverable(
                     job_id, p["name"], draft, fmt,
@@ -438,7 +463,9 @@ class AgentSDKRunner(Runner):
         return excerpts
 
     def _say(self, system, user, max_tokens=1800, tools=False, sources=None, job_id=None,
-             who="", deep=False, model=None, effort=None, include_docs=False):
+             who="", deep=False, model=None, effort=None, include_docs=False, role="work"):
+        """One Claude call. The model comes from the job's preset for this role (work, pen or verify)
+        unless `model` names one explicitly."""
         if include_docs:
             excerpts = self._relevant_documents(job_id, user)
             if excerpts:
@@ -451,15 +478,17 @@ class AgentSDKRunner(Runner):
         if use_g:
             system += ("\nYou can search Rafael's own meeting notes with meeting_search and meeting_read. Use them once or twice for prior decisions, "
                        "commitments or counterparties that bear on the mandate; quote only what you read, and never send meeting content into web searches.")
-        selected_model = model or self.model
+        selected_model = model or self.model_for(job_id, role)
+        room = self.THINK_ROOM.get(effort, 6000)
+        send_effort = bool(effort) and models.supports_effort(selected_model, self.available_models())
         collected, finished = [], False
         for _ in range(10 if deep else 8):
             kw = {"tools": (self.DEEP_TOOLS if deep else self.TOOLS) + (granola.TOOLS if use_g else [])} if tools else {}
-            if effort:
+            if send_effort:
                 kw["output_config"] = {"effort": effort}
             cost.gate(self.s, job_id, who)
             with self.client.beta.messages.stream(
-                    model=selected_model, max_tokens=max_tokens, system=system, messages=msgs,
+                    model=selected_model, max_tokens=max_tokens + room, system=system, messages=msgs,
                     betas=["web-fetch-2025-09-10", "code-execution-2025-05-22"], **kw) as stream:
                 for _event in stream:
                     pass
@@ -487,6 +516,7 @@ class AgentSDKRunner(Runner):
                 msgs = msgs + [{"role": "assistant", "content": r.content}, {"role": "user", "content": res}]
                 continue
             if r.stop_reason == "max_tokens":
+                print(f"[say] {who or 'call'} hit the {max_tokens + room}-token limit on {selected_model}; continuing", flush=True)
                 collected.extend(b.text for b in r.content if b.type == "text")
                 msgs = msgs + [{"role": "assistant", "content": r.content},
                                {"role": "user", "content": "Continue exactly where you left off. Do not repeat earlier text."}]
@@ -534,7 +564,7 @@ class AgentSDKRunner(Runner):
             self._stage(job_id, firm, 1, 3, "Dani is writing his take")
             memo = self._say(persona + "\n\n" + ref[:14000] + "\n\nGround the answer in the passages below. Quote only words that appear verbatim; keep credits to others; say plainly when something is your take rather than on the record. Use web_search for outside facts; mark anything unverified. Write in Markdown, answer first, under 700 words; refer to Daniel in the third person. Lines marked as previous speaker are not his words. Start directly with the answer: no preamble, no meta-commentary about passages or frameworks.",
                              f"Mandate: {title}\n\nSteering notes: {' '.join(self.notes.get(job_id, [])) or 'none'}\n\nPassages from his public words:\n{passages}",
-                             2400, True, {}, job_id, "Dani", model=self.model, effort="high", include_docs=True)
+                             2400, True, {}, job_id, "Dani", effort="high", include_docs=True)
             vault = Path(os.environ.get("HOLDINGS_DATA") or self.root / "server" / "data") / "vault" / f"job-{job_id}"
             vault.mkdir(parents=True, exist_ok=True)
             memo = self._clean_title(memo, title)
@@ -567,7 +597,7 @@ class AgentSDKRunner(Runner):
                 out[seat] = self._say(self._persona(seat) + "\nUse web_search and web_fetch to check facts you rely on, and code_execution (a sandbox) to compute any number you cite instead of estimating it. Cite sources by name and URL, and mark anything you could not verify as UNVERIFIED.",
                                       f"Mandate: {title}\n\nGive your independent position: verdict, the 3 things that matter most from your lane, and what would change your mind.",
                                       2500, True, sources, job_id, self.SEAT_NAMES[seat],
-                                      model=self.model, effort="high", include_docs=True)
+                                      effort="high", include_docs=True)
                 s.event("step", f"{self.SEAT_NAMES[seat]} filed a blind position", job_id, firm)
             ts = [threading.Thread(target=work, args=(x,)) for x in seats]
             [t.start() for t in ts]
@@ -575,7 +605,7 @@ class AgentSDKRunner(Runner):
             self._stage(job_id, firm, 1, 4, "All three positions filed; desk is comparing them")
             positions = "\n\n".join(f"### {self.SEAT_NAMES[k]}\n{v}" for k, v in out.items())
             raw = self._say("You are the orchestrating desk of the Office of the CTO. Reply with JSON only.",
-                            f"Mandate: {title}\n\nBlind positions:\n{positions}\n\nFind the single decision where the seats pull apart or that only Rafael can make. Return JSON: {{\"q\": question, \"why\": one sentence, \"opts\": [[label, one-line consequence, 1 for recommended or omit], ...2-3 options]}}", 700)
+                            f"Mandate: {title}\n\nBlind positions:\n{positions}\n\nFind the single decision where the seats pull apart or that only Rafael can make. Return JSON: {{\"q\": question, \"why\": one sentence, \"opts\": [[label, one-line consequence, 1 for recommended or omit], ...2-3 options]}}", 700, job_id=job_id, who="CTO Desk")
             try:
                 card = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
                 payload = {"kind": "one", "q": card["q"], "opts": card["opts"], "why": card.get("why", ""), "def": "Nothing moves until you answer."}
@@ -594,7 +624,7 @@ class AgentSDKRunner(Runner):
             steer = "\n".join(self.notes.get(job_id, []))
             memo = self._say("You are the orchestrating desk of the Office of the CTO at GTMN Holdings. Write a decision memo in a senior consulting partner's register: answer first, then reasoning, preserved dissent, risks, next steps. Markdown, under 900 words.",
                              f"Mandate: {title}\n\nBlind positions:\n{positions}\n\nRafael's decision: {answer}\n\nRafael's steering notes (apply them): {steer or 'none'}",
-                             3000, job_id=job_id, who="CTO Desk", model=self.pen_model, effort="high")
+                             3000, job_id=job_id, who="CTO Desk", role="pen", effort="high")
             memo, ver, verdict = self._verify_fix(job_id, firm, memo, sources, 3, 4)
             memo = self._clean_title(memo, title) + self._verification_note(verdict, ver)
             vault = Path(os.environ.get("HOLDINGS_DATA") or self.root / "server" / "data") / "vault" / f"job-{job_id}"

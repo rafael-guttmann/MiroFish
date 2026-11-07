@@ -11,6 +11,7 @@
   let live = false, sig = "";
   const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", wmode: false, wsel: new Set(), arch: false, open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), demandFiles: [], granola: true, convened: [] };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
+  S.models = null; S.model = (() => { try { return localStorage.getItem("gtmn-model") || ""; } catch (e) { return ""; } })();
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
   const firmAgents = f => f.agents.map(a => ({ ...a, st: S.state[f.id + "/" + a.id] }));
   const pick = (f, n, st, task) => f.agents.slice(0, n).forEach((a, i) => set(f.id, a.id, st, task));
@@ -193,7 +194,7 @@
     const card = cards.find(c => c.job === j.id);
     return `<div class="crumbs"><button data-wback="1">Work</button> / ${esc(j.t)}</div>
     <div class="wdet" style="--a:${ac}">
-      <div class="whead"><div><span class="st ${j.col}">${STL[j.col]}</span>${live && LIVE(j) ? `<button class="wstop" data-wstop="${j.id}">Stop work</button>` : ""}<h1>${esc(j.t)}</h1><p class="sub">${esc(f.name)}${j.col !== "done" && j.col !== "wait" && j.col !== "stop" ? " · now: " + esc(d.now.nm) : ""}${jcost(j) ? ` · spent <b>${jc(j)}</b> so far` : ""}</p></div>${ring(j.p, ac)}</div>
+      <div class="whead"><div><span class="st ${j.col}">${STL[j.col]}</span>${live && LIVE(j) ? `<button class="wstop" data-wstop="${j.id}">Stop work</button>` : ""}<h1>${esc(j.t)}</h1><p class="sub">${esc(f.name)}${j.col !== "done" && j.col !== "wait" && j.col !== "stop" ? " · now: " + esc(d.now.nm) : ""}${jcost(j) ? ` · spent <b>${jc(j)}</b> so far` : ""}</p>${modelLine(j)}</div>${ring(j.p, ac)}</div>
       ${card ? `<button class="needbar" data-goneeds="1"><b>${esc(card.agent)} is waiting for you</b><span>${esc(card.q)}</span><em>Answer →</em></button>` : ""}
       <h2>Progress</h2>
       <ol class="steps">${d.stages.map((s, i) => `<li class="${s.st}"><i>${s.st === "done" ? "✓" : i + 1}</i><span>${esc(s.nm)}</span></li>`).join("")}</ol>
@@ -352,8 +353,86 @@
       <h2 style="margin-top:20px">Send to <small style="font-weight:400;text-transform:none;letter-spacing:0;opacity:.7">· tap one firm, or as many as you want to convene them in a Plenary</small></h2>
       <div class="routes"><button class="chip" data-route="" aria-pressed="${S.route === null}">Let the front desk choose</button><button class="chip" data-route="plenary" aria-pressed="${S.route === "plenary"}">Several firms (Plenary)</button>${FIRMS.map(f => `<button class="chip" style="--a:${f.accent}" data-route="${f.id}" aria-pressed="${S.picks.has(f.id)}"><i></i>${esc(f.name)}</button>`).join("")}</div>
       <p class="route-note">${note}</p>
+      ${live ? `<div id="model-box" data-k="${esc(modelKey())}">${modelInner()}</div>` : ""}
       <button class="submit" id="submit" disabled>Send demand</button></div>`;
   }
+
+  /* MODEL PICKER: only models this account can really run are offered (server decides) */
+  let modelsAt = 0;
+  const modelList = () => (S.models && S.models.models) || [];
+  const modelNow = () => { const l = modelList(); return l.length ? l.find(m => m.id === S.model) || l.find(m => m.id === S.models.default) || l[0] : null; };
+  const modelKey = () => { const m = modelNow(); return m ? m.id + ":" + modelList().map(x => x.id).join() : ""; };
+  const modelPick = () => { const m = live ? modelNow() : null; return m ? m.id : undefined; };
+  function loadModels(force) {
+    if (!live || (!force && modelsAt && Date.now() - modelsAt < 60000)) return Promise.resolve();
+    return getj("/api/models").then(d => { S.models = d && d.live ? d : { models: [] }; modelsAt = Date.now(); }).catch(() => {});
+  }
+  const CHEV = `<svg class="mchev" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg>`;
+  const TICK = `<svg class="mtick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>`;
+  const modelTxt = (x, full) => `<span class="mtxt"><b>${esc(x.name)}</b>${x.badge ? `<i class="mbadge">${esc(x.badge)}</i>` : ""}<span class="mtag">${esc(x.tagline)}</span>${full ? `<span class="mmeta">${esc(x.cost)}</span>` : ""}</span>`;
+  const modelFoot = m => `${esc(m.summary)}<span class="mmeta">${esc(m.cost)}</span>`;
+  function modelInner() {
+    const l = modelList(), m = modelNow(); if (!m) return "";
+    return `<h2 class="mh">Model <small>· for this demand only</small></h2>
+      <div class="mpick">${l.length > 1
+        ? `<button type="button" class="mbtn" id="mbtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="mlist" aria-describedby="mnote" aria-label="Model: ${esc(m.name)}">${modelTxt(m)}${CHEV}</button>
+        <div class="mlist" id="mlist" role="listbox" aria-label="Choose a model" hidden>${l.map(x => `<button type="button" role="option" class="mopt" data-model="${esc(x.id)}" aria-selected="${x.id === m.id}" tabindex="-1">${modelTxt(x, 1)}${TICK}</button>`).join("")}</div>`
+        : `<div class="mbtn mone">${modelTxt(m)}</div>`}</div>
+      <p class="mnote" id="mnote" aria-live="polite">${modelFoot(m)}</p>`;
+  }
+  function modelOpen(open) {
+    const btn = $("#mbtn"), list = $("#mlist"); if (!btn || !list) return;
+    btn.setAttribute("aria-expanded", String(open)); list.hidden = !open;
+    if (!open) return;
+    const r = btn.getBoundingClientRect(), lim = $("#main").getBoundingClientRect(), edge = list.offsetHeight - list.clientHeight;
+    /* the visible area is the part of #main that is also on screen */
+    const below = Math.min(lim.bottom, innerHeight) - r.bottom - 14, above = r.top - Math.max(lim.top, 0) - 14, want = Math.min(list.scrollHeight + edge, 480), up = below < want && above > below;
+    list.classList.toggle("up", up); list.style.maxHeight = Math.max(160, Math.min(want, up ? above : below)) + "px";
+    const cur = list.querySelector('[aria-selected="true"]') || list.firstElementChild;
+    cur.focus({ preventScroll: true }); cur.scrollIntoView({ block: "nearest" });
+  }
+  function modelChoose(id) {
+    S.model = id; try { localStorage.setItem("gtmn-model", id); } catch (e) {}
+    const m = modelNow(), btn = $("#mbtn"); if (!m || !btn) return;
+    btn.querySelector(".mtxt").outerHTML = modelTxt(m); btn.setAttribute("aria-label", "Model: " + m.name);
+    document.querySelectorAll("#mlist .mopt").forEach(o => o.setAttribute("aria-selected", String(o.dataset.model === m.id)));
+    $("#mnote").innerHTML = modelFoot(m); $("#model-box").dataset.k = modelKey();
+    modelOpen(false); btn.focus();
+  }
+  function bindModel() {
+    const box = $("#model-box"); if (!box) return;
+    box.onclick = e => {
+      const o = e.target.closest(".mopt"), b = e.target.closest("#mbtn");
+      if (o) modelChoose(o.dataset.model); else if (b) modelOpen(b.getAttribute("aria-expanded") !== "true");
+    };
+    box.onkeydown = e => {
+      const list = $("#mlist"); if (!list) return;
+      const open = !list.hidden, opts = [...list.querySelectorAll(".mopt")], i = opts.indexOf(document.activeElement);
+      if (!open) { if (e.target.id === "mbtn" && (e.key === "ArrowDown" || e.key === "ArrowUp")) { e.preventDefault(); modelOpen(true); } return; }
+      if (e.key === "Escape") { e.preventDefault(); modelOpen(false); $("#mbtn").focus(); }
+      else if (e.key === "Tab") { modelOpen(false); $("#mbtn").focus(); }
+      else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+        e.preventDefault();
+        const n = e.key === "Home" ? 0 : e.key === "End" ? opts.length - 1 : e.key === "ArrowDown" ? Math.min(opts.length - 1, i + 1) : Math.max(0, i - 1);
+        opts[n].focus({ preventScroll: true }); opts[n].scrollIntoView({ block: "nearest" });
+      }
+    };
+  }
+  function paintModel() {
+    const box = $("#model-box"); if (!box || box.dataset.k === modelKey()) return;
+    box.innerHTML = modelInner(); box.dataset.k = modelKey(); bindModel();
+  }
+  function wireModel() {
+    if (!live) return;
+    bindModel();
+    loadModels().then(() => { if (S.tab === "new") paintModel(); });
+  }
+  document.addEventListener("click", e => { const l = $("#mlist"); if (l && !l.hidden && !e.target.closest("#model-box")) modelOpen(false); });
+  const joinNames = a => a.length > 1 ? a.slice(0, -1).join(", ") + " and " + a[a.length - 1] : a[0] || "";
+  const modelLine = j => {
+    const ran = joinNames(j.ran || []); if (!j.mn && !ran) return "";
+    return `<p class="mline">${j.mn ? `Model: <b>${esc(j.mn)}</b>${ran && ran !== j.mn ? ` · ran on ${esc(ran)}` : ""}` : `Ran on <b>${esc(ran)}</b>`}</p>`;
+  };
 
   /* ASIDE (desktop) */
   function renderAside(feedOnly) {
@@ -444,7 +523,7 @@
     $("#later").onclick = () => { if (cards.length > 1) { cards.push(cards.shift()); S.sel.clear(); toast("Moved to the end. The team works on other things."); render(); } else toast("It's the only card. It stays here until you answer."); };
     sync();
   }
-  function wireNew() { wireNewSubmit(); }
+  function wireNew() { wireNewSubmit(); wireModel(); }
   function wireNewSubmit() {
     const d = $("#demand"), s = $("#submit");
     d.oninput = () => s.disabled = !d.value.trim();
@@ -478,13 +557,13 @@
       const t = d.value.trim(); if (!t) return;
       if (live) {
         const form = new FormData();
-        form.append("metadata", JSON.stringify({ title: t, firm: S.route || undefined, firms: S.picks.size > 1 ? [...S.picks] : undefined, formats: [...S.newFmts], design: S.nds, granola: S.granola }));
+        form.append("metadata", JSON.stringify({ title: t, firm: S.route || undefined, firms: S.picks.size > 1 ? [...S.picks] : undefined, formats: [...S.newFmts], design: S.nds, granola: S.granola, model: modelPick() }));
         S.demandFiles.forEach(file => form.append("files", file, file.name));
         s.disabled = true; s.textContent = "Sending…";
         fetch("/api/jobs", { method: "POST", body: form }).then(async r => {
           const j = await r.json();
           if (r.status === 409) { toast(`${j.name}'s charter isn't approved yet. Approve it in Charters first.`); return; }
-          if (!r.ok) { toast(j.error || "The server refused this demand."); return; }
+          if (!r.ok) { toast(j.error || "The server refused this demand."); if (r.status === 400 && /model/i.test(j.error || "")) loadModels(true).then(paintModel); return; }
           S.newFmts.clear(); S.nds = null; S.route = null; S.picks.clear(); S.demandFiles = []; S.tab = "board"; await pull(); render();
           toast(`Sent to ${fl(j.firm).name}${j.files ? ` with ${j.files} document${j.files === 1 ? "" : "s"}` : ""}. Watch it on the board.`);
         }).catch(() => toast("Could not reach the server. Your demand and documents are still here."))
@@ -602,7 +681,7 @@
     let js, cs, lb;
     try { [js, cs, lb] = await Promise.all([getj("/api/jobs"), getj("/api/cards"), getj("/api/library")]); } catch (e) { return; }
     const docOf = job => (lb.docs.find(d => d.job === job) || {}).id;
-    const mapJ = j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, files: j.files || [], live: 1 });
+    const mapJ = j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, files: j.files || [], live: 1, mn: j.model_name || null, ran: j.ran_on || [] });
     const sess = js.filter(j => !j.archived && (j.convened || []).length);
     S.convened = [...new Set(sess.flatMap(j => j.convened))].filter(id => byId[id]);
     S.mandate = sess.map(j => j.title).join(" · ");
@@ -621,6 +700,7 @@
   async function goLive() {
     try { const r = await fetch("/api/firms"); if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) return; } catch (e) { return; }
     live = true; jobs = []; cards = []; docs = []; sig = "";
+    loadModels();
     try {
       const server = Object.fromEntries((await getj("/api/charters")).map(x => [x.charter, x.decision]));
       for (const id in rev) if (rev[id].decision !== "proposed" && server[id] !== rev[id].decision) await post("/api/charters/" + id + "/review", { decision: rev[id].decision, note: rev[id].note || "" });

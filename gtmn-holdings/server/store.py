@@ -63,6 +63,10 @@ class Store:
                 self.db.execute("ALTER TABLE jobs ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
             except sqlite3.OperationalError:
                 pass
+            try:
+                self.db.execute("ALTER TABLE jobs ADD COLUMN model TEXT")
+            except sqlite3.OperationalError:
+                pass
             self.db.commit()
 
     def run(self, sql, args=()):

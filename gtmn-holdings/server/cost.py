@@ -15,6 +15,8 @@ PRICES = {
     "claude-sonnet-4-5": (3.0, 15.0, 0.10),
     "sonnet": (3.0, 15.0, 0.10),
 }
+# Haiku 5.5 charges more once a single prompt (input + cache read + cache write) passes 100k tokens.
+LONG_PROMPT = {"claude-haiku-5-5": (100_000, (0.50, 2.50, 0.10))}
 SEARCH = 0.01
 DEFAULT_CAP = float(os.environ.get("HOLDINGS_DEFAULT_CAP", "25"))
 
@@ -34,9 +36,11 @@ def _check_job(s, job_id):
             raise JobStopped("stopped by Rafael")
 
 
-def _price(model):
+def _price(model, prompt_tokens=0):
     m = (model or "").lower()
-    return PRICES[max((key for key in PRICES if key in m), key=len, default="sonnet")]
+    key = max((k for k in PRICES if k in m), key=len, default="sonnet")
+    tier = LONG_PROMPT.get(key)
+    return tier[1] if tier and prompt_tokens > tier[0] else PRICES[key]
 
 
 def _month(t=None):
@@ -55,15 +59,16 @@ def put(s, key, value):
 def record(s, job_id, model, usage):
     if usage is None:
         return 0.0
-    pin, pout, cache_read_multiplier = _price(model)
     g = lambda k: getattr(usage, k, 0) or 0
+    prompt = g("input_tokens") + g("cache_read_input_tokens") + g("cache_creation_input_tokens")
+    pin, pout, cache_read_multiplier = _price(model, prompt)
     st = getattr(usage, "server_tool_use", None)
     searches = (getattr(st, "web_search_requests", 0) or 0) if st else 0
     usd = (g("input_tokens") * pin + g("output_tokens") * pout
            + g("cache_read_input_tokens") * pin * cache_read_multiplier
            + g("cache_creation_input_tokens") * pin * 1.25) / 1e6 + searches * SEARCH
     s.run("INSERT INTO usage(job,model,tokens_in,tokens_out,usd,created) VALUES(?,?,?,?,?,?)",
-          (job_id, model, g("input_tokens") + g("cache_read_input_tokens") + g("cache_creation_input_tokens"), g("output_tokens"), usd, time.time()))
+          (job_id, model, prompt, g("output_tokens"), usd, time.time()))
     return usd
 
 

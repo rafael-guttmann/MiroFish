@@ -167,6 +167,36 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 .submit:disabled{opacity:.25;cursor:default}
 .submit:not(:disabled):hover{transform:translateY(-1px)}
 
+/* model picker */
+.mh{margin-top:20px}.mh small{font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink2)}
+.mpick{position:relative;margin:14px 0 0}
+.mbtn,.mopt{display:flex;align-items:center;gap:12px;width:100%;text-align:left}
+.mbtn{background:#fff;border:1.5px solid var(--line2);border-radius:14px;padding:13px 16px;transition:border-color .15s}
+button.mbtn:hover{border-color:var(--ink2)}
+.mbtn[aria-expanded=true]{border-color:var(--ink)}
+.mtxt{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px}
+.mtxt b{font-size:15px;font-weight:600}
+.mbadge{font:600 11.5px/1 var(--sans);padding:4px 8px;border-radius:99px;background:#EAF5EE;color:#1c5a35}
+.mtag,.mmeta{flex-basis:100%;color:var(--ink2)}
+.mtag{font-size:13.5px;line-height:1.4}
+.mmeta{display:block;font-size:12.5px;line-height:1.4}
+.mchev,.mtick{flex:none;width:18px;height:18px;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.mchev{stroke:var(--ink2);stroke-width:2;transition:transform .2s var(--ease)}
+.mbtn[aria-expanded=true] .mchev{transform:rotate(180deg)}
+.mtick{stroke:var(--ink);stroke-width:2.2;opacity:0;margin-top:2px}
+.mopt[aria-selected=true] .mtick{opacity:1}
+.mlist{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px;overflow-y:auto;overscroll-behavior:contain;box-shadow:0 2px 6px rgba(22,24,29,.06),0 16px 40px rgba(22,24,29,.14);animation:mpop .18s var(--ease)}
+.mlist[hidden]{display:none}
+.mlist.up{top:auto;bottom:calc(100% + 6px);animation-name:mpopu}
+.mopt{padding:11px 12px;border-radius:10px;align-items:flex-start}
+.mopt:hover,.mopt:focus-visible{background:#F6F4EF}
+.mopt[aria-selected=true]{background:#EFEBE1}
+@keyframes mpop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes mpopu{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.mnote{font-size:14px;line-height:1.45;color:var(--ink2);margin:8px 0 18px}
+.mnote .mmeta{margin-top:2px}
+.mline{margin-top:6px;font-size:13px;color:var(--ink2)}.mline b{font-weight:600;color:var(--ink)}
+
 /* floor: retro console frame */
 .fl-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:8px;scrollbar-width:thin}
 .fl-bar .chip{flex:none;padding:7px 13px;font:600 13px/1 var(--sans);border-radius:99px;border:1px solid var(--line);background:#fff;color:var(--ink);display:inline-flex;align-items:center}
@@ -364,6 +394,6 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 <script src="charters.js"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}))</script>
 <script src="floor.js?v=24"></script>
-<script src="app.js?v=43"></script>
+<script src="app.js?v=47"></script>
 </body>
 </html>

@@ -20,6 +20,7 @@ from urllib.parse import quote, unquote, urlparse
 
 from runner import AgentSDKRunner, SimulatedRunner
 import backup
+import models
 import render
 import uploads
 from store import Store
@@ -199,6 +200,10 @@ class H(BaseHTTPRequestHandler):
                                     "partners": c.get("senior_panel", []), "outputs": c.get("outputs", [])} for c in charters.values()])
         if p == "/api/charters":
             return self.send(200, store.rows("SELECT charter, decision, note, created FROM charter_reviews r WHERE id=(SELECT MAX(id) FROM charter_reviews WHERE charter=r.charter)"))
+        if p == "/api/models":
+            live = hasattr(runner, "client")
+            return self.send(200, {"live": live, "default": models.DEFAULT_PRESET,
+                                   "models": models.catalog(runner.available_models()) if live else []})
         m = re.fullmatch(r"/api/jobs/(\d+)/thread", p)
         if m:
             return self.send(200, store.rows("SELECT role, text, created FROM messages WHERE job=? ORDER BY id", (m[1],)))
@@ -225,10 +230,15 @@ class H(BaseHTTPRequestHandler):
                                    for e in store.rows("SELECT * FROM charter_edits WHERE id IN (SELECT MAX(id) FROM charter_edits GROUP BY charter)")})
         if p == "/api/jobs":
             js = store.rows("SELECT * FROM jobs ORDER BY id DESC")
+            used = {}
+            for u in store.rows("SELECT job, model, SUM(usd) AS usd FROM usage WHERE job IS NOT NULL GROUP BY job, model"):
+                used.setdefault(u["job"], []).append(u)
             for j in js:
                 j["files"] = store.rows("SELECT id,name,mime,size,created FROM job_files WHERE job=? ORDER BY id", (j["id"],))
                 ev = store.one("SELECT text FROM events WHERE job=? AND kind='convened' ORDER BY id DESC", (j["id"],)) if j["firm"] == "plenary" else None
                 j["convened"] = ev["text"].split(",") if ev and j["status"] in ("working", "asking") else []
+                j["model_name"] = models.preset_name(j.get("model"))
+                j["ran_on"] = models.ran_on(used.get(j["id"], []))
             return self.send(200, js)
         m = re.fullmatch(r"/api/jobs/(\d+)/files/(\d+)", p)
         if m:
@@ -255,6 +265,8 @@ class H(BaseHTTPRequestHandler):
             j["events"] = store.rows("SELECT * FROM events WHERE job=? ORDER BY id", (m[1],))
             j["docs"] = store.rows("SELECT * FROM docs WHERE job=?", (m[1],))
             j["files"] = store.rows("SELECT id,name,mime,size,created FROM job_files WHERE job=? ORDER BY id", (m[1],))
+            j["model_name"] = models.preset_name(j.get("model"))
+            j["ran_on"] = models.ran_on(store.rows("SELECT model, SUM(usd) AS usd FROM usage WHERE job=? GROUP BY model", (m[1],)))
             return self.send(200, j)
         if p == "/api/cards":
             cs = store.rows("SELECT * FROM cards WHERE state='open' ORDER BY id")
@@ -332,8 +344,12 @@ class H(BaseHTTPRequestHandler):
                 for f in picks:
                     if not approved(f):
                         return self.send(409, {"error": "charter not approved", "firm": f, "name": charters[f]["name"]})
-            jid = store.run("INSERT INTO jobs(title,firm,formats,design,created,granola) VALUES(?,?,?,?,?,?)",
-                            (title, firm, json.dumps(fmts), b.get("design"), time.time(), 0 if b.get("granola") is False else 1))
+            try:
+                preset = models.validate(b.get("model"), runner.available_models())
+            except ValueError as e:
+                return self.send(400, {"error": str(e)})
+            jid = store.run("INSERT INTO jobs(title,firm,formats,design,created,granola,model) VALUES(?,?,?,?,?,?,?)",
+                            (title, firm, json.dumps(fmts), b.get("design"), time.time(), 0 if b.get("granola") is False else 1, preset))
             saved = []
             try:
                 if files:

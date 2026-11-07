@@ -117,7 +117,7 @@ def run(r, job_id):
             sysm = (r._persona_at(f, sid) + "\n\nYou are seated at the GTMN Plenary for " + avail[f]["name"] + ". Stay inside your firm's lane: " + ", ".join(avail[f].get("owns", [])) +
                     ". Use web_search and web_fetch to verify facts you rely on and cite them; mark anything unverified as UNVERIFIED. You see only the mandate and the fact ledger, not the other firms. If the ledger holds a MEETING BRIEF, build on it: it is real evidence from Rafael's own meetings. Never refuse to give a position because more data would help; give your best position from what exists and list the missing data under NEEDS.")
             env[(f, sid)] = say(sysm, f"{facts}\n\nFile your position in four labelled sections: POSITION (verdict and reasons, from your lane only), NEEDS (what you need from another lane), CONSTRAINTS (what you will not accept), FACTS CHALLENGED. Under 450 words.",
-                                   2500, True, sources, job_id, nm)
+                                   2500, True, sources, job_id, nm, model=r.model, effort="high", include_docs=True)
             (vault / "envelopes" / f"{f}--{sid}.md").write_text(env[(f, sid)])
             s.event("step", f"{nm} ({avail[f]['name']}) filed a blind position", job_id, firm)
         ts = [threading.Thread(target=blind, args=a) for a in seats]
@@ -176,7 +176,7 @@ def run(r, job_id):
                 mine = [i for i in iss if i["id"] == iid] or iss
                 out = say(r._persona_at(f, sid) + "\n\nYou have been called into the GTMN Plenary as a specialist after round one. Stay inside your firm's lane: " + ", ".join(avail[f].get("owns", [])) + ". Use web_search and web_fetch for facts and cite them; mark anything unverified as UNVERIFIED.",
                           f"Mandate: {title}\n\nAll positions, verbatim:\n{v1}\n\nCross-examination so far:\n{v2}\n\nThe issue you were called for:\n{json.dumps(mine, indent=1)}\n\nReply: AGREE, DISAGREE or CONDITIONAL with your reason, then what the room is missing from your specialty. Under 350 words.",
-                          2500, True, sources, job_id, nm)
+                          2500, True, sources, job_id, nm, model=r.model, effort="high", include_docs=True)
                 env[(f, sid)] = out
                 replies[(f, sid)] = out
                 for i in mine:
@@ -220,10 +220,14 @@ def run(r, job_id):
         steer = "\n".join(r.notes.get(job_id, []))
         rec = "\n".join(f"- {i['question']} → Rafael decided: {a}" for i, a in decisions) or "none needed"
         memo = say(f"You hold the pen for {'the ' + avail[lead]['name'] + ' desk' if single else 'the GTMN Plenary as ' + avail[lead]['name'] + chr(39) + 's orchestrator'}. House style: {avail[lead]['summary'][:350]}. Write a decision memo to Rafael in a senior consulting partner's register. If a MEETING BRIEF is in the record, use its facts and name the meeting. Never open with a refusal: give the best-supported answer from the evidence and show what is missing as caveats. Structure: answer first; what the firms agreed; what Rafael decided; dissent preserved verbatim in each firm's own words, never averaged; remaining open items; next steps. Each section credits the firm. Markdown, under 1100 words.",
-                      f"Header rule: the memo starts with the line \"TO: Rafael\" exactly. Do not add a surname or title for him, and do not name any company other than GTMN Holdings and the firms listed.\n\nMandate: {title}\n\nFirms: {', '.join(avail[f]['name'] for f in fids)}\n\nPositions, verbatim:\n{v1}\n\nCross-examination:\n{v2}\n\nIssue status: {json.dumps(st)}\n\nRafael's decisions:\n{rec}\n\nStill open, not asked: {json.dumps(left)}\n\nRafael's steering notes (apply them): {steer or 'none'}", 3000)
+                      f"Header rule: the memo starts with the line \"TO: Rafael\" exactly. Do not add a surname or title for him, and do not name any company other than GTMN Holdings and the firms listed.\n\nMandate: {title}\n\nFirms: {', '.join(avail[f]['name'] for f in fids)}\n\nPositions, verbatim:\n{v1}\n\nCross-examination:\n{v2}\n\nIssue status: {json.dumps(st)}\n\nRafael's decisions:\n{rec}\n\nStill open, not asked: {json.dumps(left)}\n\nRafael's steering notes (apply them): {steer or 'none'}",
+                      4000, job_id=job_id, who="Plenary Pen", model=r.pen_model, effort="high")
         memo, ver, verdict = r._verify_fix(job_id, firm, memo, sources)
+        memo = r._clean_title(memo, title) + r._verification_note(verdict, ver)
         (vault / "facts.md").write_text(f"# Fact ledger\n\n- {facts}\n" + "".join(f"- Rafael decided on {i['id']}: {a}\n" for i, a in decisions))
-        (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n\n---\n## Verification ({verdict})\n\n{ver}\n\n## Sources consulted\n\n" + "\n".join(f"- {v}: {k}" for k, v in sources.items()) + f"\n\n---\n## Plenary file\n\n### Blind positions\n\n{v1}\n\n### Cross-examination\n\n{v2}\n")
+        (vault / "decision-memo.md").write_text(f"# {title}\n\n{memo}\n")
+        r._save_working_papers(job_id, title, firm, ver, sources,
+                               positions=v1, cross_exam=v2, facts=facts)
         fmts = j["formats"]
         r._deliver(job_id, firm, title, memo, verdict, firm + "-desk", json.loads(fmts))
         s.run("UPDATE jobs SET status='done', progress=1, stage=4 WHERE id=?", (job_id,))

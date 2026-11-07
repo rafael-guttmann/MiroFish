@@ -9,7 +9,9 @@ import cost
 import os
 import re
 import shutil
+import sqlite3
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import hashlib
@@ -19,6 +21,7 @@ from urllib.parse import quote, unquote, urlparse
 from runner import AgentSDKRunner, SimulatedRunner
 import backup
 import render
+import uploads
 from store import Store
 from urllib.parse import parse_qs
 
@@ -33,6 +36,7 @@ ROOT = HERE.parent
 UI = ROOT / "ui-prototype"
 TOKEN = os.environ.get("HOLDINGS_TOKEN", "")
 MAX_BODY = 1_000_000
+MAX_UPLOAD_BODY = uploads.MAX_TOTAL_BYTES + 1024 * 1024
 USER = os.environ.get("HOLDINGS_USER", "")
 PW_HASH = os.environ.get("HOLDINGS_PW_HASH", "")
 fails = {}
@@ -95,7 +99,7 @@ def job_action(ids, act):
         elif act == "unarchive":
             store.run("UPDATE jobs SET archived=0 WHERE id=?", (i,))
         elif act == "delete":
-            for t in ("events", "cards", "docs", "messages"):
+            for t in ("events", "cards", "docs", "messages", "job_files"):
                 store.run(f"DELETE FROM {t} WHERE job=?", (i,))
             store.run("DELETE FROM jobs WHERE id=?", (i,))
             shutil.rmtree(DATA / "vault" / f"job-{i}", ignore_errors=True)
@@ -222,9 +226,27 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/jobs":
             js = store.rows("SELECT * FROM jobs ORDER BY id DESC")
             for j in js:
+                j["files"] = store.rows("SELECT id,name,mime,size,created FROM job_files WHERE job=? ORDER BY id", (j["id"],))
                 ev = store.one("SELECT text FROM events WHERE job=? AND kind='convened' ORDER BY id DESC", (j["id"],)) if j["firm"] == "plenary" else None
                 j["convened"] = ev["text"].split(",") if ev and j["status"] in ("working", "asking") else []
             return self.send(200, js)
+        m = re.fullmatch(r"/api/jobs/(\d+)/files/(\d+)", p)
+        if m:
+            row = store.one("SELECT * FROM job_files WHERE id=? AND job=?", (m[2], m[1]))
+            if not row:
+                return self.send(404, {"error": "file not found"})
+            root = (DATA / "vault" / f"job-{m[1]}" / "inputs").resolve()
+            f = (DATA / "vault" / f"job-{m[1]}" / row["storage"]).resolve()
+            if root not in f.parents or not f.is_file():
+                return self.send(404, {"error": "file not found"})
+            body = f.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", row["mime"])
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Disposition", f"attachment; filename=\"document\"; filename*=UTF-8''{quote(row['name'])}")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            return self.wfile.write(body)
         m = re.fullmatch(r"/api/jobs/(\d+)", p)
         if m:
             j = store.one("SELECT * FROM jobs WHERE id=?", (m[1],))
@@ -232,6 +254,7 @@ class H(BaseHTTPRequestHandler):
                 return self.send(404, {"error": "not found"})
             j["events"] = store.rows("SELECT * FROM events WHERE job=? ORDER BY id", (m[1],))
             j["docs"] = store.rows("SELECT * FROM docs WHERE job=?", (m[1],))
+            j["files"] = store.rows("SELECT id,name,mime,size,created FROM job_files WHERE job=? ORDER BY id", (m[1],))
             return self.send(200, j)
         if p == "/api/cards":
             cs = store.rows("SELECT * FROM cards WHERE state='open' ORDER BY id")
@@ -277,9 +300,23 @@ class H(BaseHTTPRequestHandler):
         if not self.authed():
             return self.send(401, {"error": "unauthorized"})
         try:
-            b = self.body()
-        except (ValueError, json.JSONDecodeError):
-            return self.send(400, {"error": "bad body"})
+            content_type = self.headers.get("Content-Type", "")
+            files = []
+            if p == "/api/jobs" and content_type.lower().startswith("multipart/form-data"):
+                n = int(self.headers.get("Content-Length") or 0)
+                if n > MAX_UPLOAD_BODY:
+                    return self.send(413, {"error": "Upload is too large. Documents must total 10 MB or less."})
+                metadata, raw_files = uploads.parse_multipart(content_type, self.rfile.read(n))
+                b = json.loads(metadata)
+                if not isinstance(b, dict):
+                    raise ValueError("Demand details are invalid.")
+                files = uploads.prepare_files(raw_files)
+            else:
+                b = self.body()
+        except ValueError as e:
+            return self.send(400, {"error": str(e) or "bad body"})
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return self.send(400, {"error": "Demand details are not valid JSON."})
         if p == "/api/jobs":
             title = str(b.get("title", "")).strip()[:300]
             if not title:
@@ -297,11 +334,29 @@ class H(BaseHTTPRequestHandler):
                         return self.send(409, {"error": "charter not approved", "firm": f, "name": charters[f]["name"]})
             jid = store.run("INSERT INTO jobs(title,firm,formats,design,created,granola) VALUES(?,?,?,?,?,?)",
                             (title, firm, json.dumps(fmts), b.get("design"), time.time(), 0 if b.get("granola") is False else 1))
+            saved = []
+            try:
+                if files:
+                    folder = DATA / "vault" / f"job-{jid}" / "inputs"
+                    folder.mkdir(parents=True, exist_ok=True)
+                    for item in files:
+                        suffix = Path(item["name"]).suffix.lower()
+                        storage = "inputs/" + uuid.uuid4().hex + suffix
+                        (DATA / "vault" / f"job-{jid}" / storage).write_bytes(item["data"])
+                        file_id = store.run(
+                            "INSERT INTO job_files(job,name,mime,storage,text,size,created) VALUES(?,?,?,?,?,?,?)",
+                            (jid, item["name"], item["mime"], storage, item["text"], len(item["data"]), time.time()))
+                        saved.append(file_id)
+            except (OSError, sqlite3.Error):
+                store.run("DELETE FROM job_files WHERE job=?", (jid,))
+                store.run("DELETE FROM jobs WHERE id=?", (jid,))
+                shutil.rmtree(DATA / "vault" / f"job-{jid}", ignore_errors=True)
+                return self.send(500, {"error": "Could not save the attached documents. Please try again."})
             if picks:
                 store.event("picks", "Rafael chose the firms: " + ", ".join(picks), jid, firm)
             store.event("routed", f"Front desk routed the demand to {firm}", jid, firm)
             runner.start(jid)
-            return self.send(201, {"id": jid, "firm": firm})
+            return self.send(201, {"id": jid, "firm": firm, "files": len(saved)})
         if p == "/api/backup":
             try:
                 return self.send(200, do_backup())

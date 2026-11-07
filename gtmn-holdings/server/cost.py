@@ -3,8 +3,18 @@ import calendar
 import os
 import time
 
-# USD per million tokens (input, output); web search is USD per search.
-PRICES = {"sonnet": (3.0, 15.0), "haiku": (1.0, 5.0), "opus": (15.0, 75.0)}
+# USD per million tokens (input, output, cache-read multiplier); web search is USD per search.
+PRICES = {
+    "claude-fable-5-1": (10.0, 50.0, 0.025),
+    "claude-opus-5-5": (4.0, 20.0, 0.05),
+    "claude-sonnet-5-5": (2.0, 10.0, 0.05),
+    "claude-haiku-5-5": (0.10, 0.50, 0.10),
+    "claude-opus-4-5": (5.0, 25.0, 0.10),
+    "claude-opus-4-1": (15.0, 75.0, 0.10),
+    "claude-opus-4": (15.0, 75.0, 0.10),
+    "claude-sonnet-4-5": (3.0, 15.0, 0.10),
+    "sonnet": (3.0, 15.0, 0.10),
+}
 SEARCH = 0.01
 DEFAULT_CAP = float(os.environ.get("HOLDINGS_DEFAULT_CAP", "25"))
 
@@ -26,10 +36,7 @@ def _check_job(s, job_id):
 
 def _price(model):
     m = (model or "").lower()
-    for k, v in PRICES.items():
-        if k in m:
-            return v
-    return PRICES["sonnet"]
+    return PRICES[max((key for key in PRICES if key in m), key=len, default="sonnet")]
 
 
 def _month(t=None):
@@ -48,11 +55,12 @@ def put(s, key, value):
 def record(s, job_id, model, usage):
     if usage is None:
         return 0.0
-    pin, pout = _price(model)
+    pin, pout, cache_read_multiplier = _price(model)
     g = lambda k: getattr(usage, k, 0) or 0
     st = getattr(usage, "server_tool_use", None)
     searches = (getattr(st, "web_search_requests", 0) or 0) if st else 0
-    usd = (g("input_tokens") * pin + g("output_tokens") * pout + g("cache_read_input_tokens") * pin * 0.1
+    usd = (g("input_tokens") * pin + g("output_tokens") * pout
+           + g("cache_read_input_tokens") * pin * cache_read_multiplier
            + g("cache_creation_input_tokens") * pin * 1.25) / 1e6 + searches * SEARCH
     s.run("INSERT INTO usage(job,model,tokens_in,tokens_out,usd,created) VALUES(?,?,?,?,?,?)",
           (job_id, model, g("input_tokens") + g("cache_read_input_tokens") + g("cache_creation_input_tokens"), g("output_tokens"), usd, time.time()))

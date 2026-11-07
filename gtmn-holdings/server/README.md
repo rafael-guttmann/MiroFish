@@ -16,8 +16,10 @@ Every approved firm with personas in `../firms/<id>/agents/` (Dani has his own s
 Agents can search the web, run sandboxed code and, when `GRANOLA_API_KEY` is set and the demand has `granola` true (default), search Rafael's Granola meetings. Each lookup shows in the job activity.
 
 ## API
-GET `/api/firms|charters|jobs|jobs/:id|cards|library|backup|stream` (SSE), `/api/cost`, `/api/jobs/:id/thread`, `/api/docs/:id/file?format=PDF|Word|Excel|PowerPoint|JPEG|Markdown|text`, `/api/docs.zip`, `/api/backup.zip`.
-POST `/api/jobs` (`title`, `firm`, `firms`, `formats`, `granola`), `/api/jobs/bulk` (`ids`, `action`: stop|archive|unarchive|delete), `/api/jobs/:id/steer`, `/api/cards/:id/answer`, `/api/charters/:id/review` (approve, edit), `/api/design-systems`, `/api/backup`.
+GET `/api/firms|charters|jobs|jobs/:id|cards|library|backup|stream` (SSE), `/api/cost`, `/api/jobs/:id/thread`, `/api/jobs/:id/files/:file_id`, `/api/docs/:id/file?format=PDF|Word|Excel|PowerPoint|JPEG|Markdown|text`, `/api/docs.zip`, `/api/backup.zip`.
+POST `/api/jobs` (`title`, `firm`, `firms`, `formats`, `granola`; multipart forms may also include up to eight reference documents), `/api/jobs/bulk` (`ids`, `action`: stop|archive|unarchive|delete), `/api/jobs/:id/steer`, `/api/cards/:id/answer`, `/api/charters/:id/review` (approve, edit), `/api/design-systems`, `/api/backup`.
+
+New-demand reference documents can be PDF, DOCX, XLSX, PPTX, TXT, Markdown or CSV, up to 5 MB each and 10 MB total. Readable text is extracted for the team, while the original is kept with the demand and available to download. Uploaded contents are treated as untrusted evidence, not instructions.
 
 Job statuses: waiting, working, asking, done, stopped. Stop takes effect at the job's next model call; stopped jobs keep their files. Archive hides a job from the Work tab; delete removes its files.
 `/api/jobs` lists `convened` (firm ids) for running Plenaries; the boardroom shows only those firms and is empty when none is in session.

@@ -9,7 +9,7 @@
   const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   let live = false, sig = "";
-  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", wmode: false, wsel: new Set(), arch: false, open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), granola: true, convened: [] };
+  const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", wmode: false, wsel: new Set(), arch: false, open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), demandFiles: [], granola: true, convened: [] };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
   const firmAgents = f => f.agents.map(a => ({ ...a, st: S.state[f.id + "/" + a.id] }));
@@ -197,6 +197,7 @@
       ${card ? `<button class="needbar" data-goneeds="1"><b>${esc(card.agent)} is waiting for you</b><span>${esc(card.q)}</span><em>Answer →</em></button>` : ""}
       <h2>Progress</h2>
       <ol class="steps">${d.stages.map((s, i) => `<li class="${s.st}"><i>${s.st === "done" ? "✓" : i + 1}</i><span>${esc(s.nm)}</span></li>`).join("")}</ol>
+      ${j.files && j.files.length ? `<h2>Reference documents · ${j.files.length}</h2><div class="source-files">${j.files.map(file => `<a class="source-file" href="/api/jobs/${j.id}/files/${file.id}"><span>▤</span><b>${esc(file.name)}</b><small>${Math.ceil(file.size / 1024)} KB · read by the team</small><em>Download</em></a>`).join("")}</div>` : ""}
       <div class="wcols">
         <div><h2>Who is working</h2>${j.col === "done" ? `<p class="sub">Everyone has finished.</p>` : j.col === "stop" ? `<p class="sub">You stopped this work.</p>` : j.col === "wait" ? `<p class="sub">Nobody yet. It starts when a desk is free.</p>` : who.map(w => `<button class="desk" ${w.id ? `data-openagent="${w.f.id}/${w.id}"` : ""}>${pawn(w.f, w.name, "working")}<div><b>${esc(w.name)}</b><small class="state-work">${esc(d.now.nm)}</small></div></button>`).join("")}</div>
         <div><h2>Who did the most</h2>${d.people.length ? d.people.map(([n, v]) => `<div class="hb"><span>${esc(n)}</span><div><i style="width:${v / max * 100}%"></i></div><b>${v}</b></div>`).join("") : `<p class="sub">Nothing yet.</p>`}</div>
@@ -343,7 +344,8 @@
     const note = S.route === null ? "The front desk will pick the right firm, or call a Plenary if it needs several." : S.picks.size > 1 ? `Plenary will convene exactly these ${S.picks.size} firms: ${[...S.picks].map(i => esc(byId[i].name)).join(", ")}.` : S.route === "plenary" ? "Plenary will convene the firms that fit and run it as one working group." : `Goes straight to ${esc(byId[S.route].name)}.`;
     return `<div class="form"><h1>What do you need?</h1><p class="sub" style="margin-bottom:20px">Write it like a note to a colleague. They'll ask if they need more.</p>
       <textarea class="big" id="demand" placeholder="For example: Should we acquire a Brazilian payments company at a 6x revenue multiple?"></textarea>
-      <div class="drop">Drop files here or <label style="text-decoration:underline;cursor:pointer">choose files<input type="file" multiple hidden></label></div>
+      <div class="drop" id="demand-drop">Drop documents here or <label style="text-decoration:underline;cursor:pointer">choose files<input type="file" id="demand-files" accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv" multiple hidden></label><small>PDF, Word, Excel, PowerPoint, text, Markdown or CSV · 5 MB each, 10 MB total</small></div>
+      ${S.demandFiles.length ? `<div class="demand-files" id="demand-file-list" aria-live="polite">${S.demandFiles.map((file, i) => `<span class="fchip">${esc(file.name)} <button type="button" data-remove-demand-file="${i}" aria-label="Remove ${esc(file.name)}">×</button></span>`).join("")}</div>` : ""}
       <h2 style="margin-top:20px">Deliverable format</h2><div class="routes"><button class="chip" data-nfmt="" aria-pressed="${!S.newFmts.size}">Ask me when it's ready</button>${Object.keys(FMT).map(k => `<button class="chip" data-nfmt="${k}" aria-pressed="${S.newFmts.has(k)}">${k}</button>`).join("")}</div>
       <h2 style="margin-top:20px">Your meeting notes</h2><div class="routes"><button class="chip" data-gr="1" aria-pressed="${S.granola}">Agents may search my Granola meetings</button><button class="chip" data-gr="0" aria-pressed="${!S.granola}">Keep meetings out of this one</button></div>
       <h2 style="margin-top:20px">Design system</h2><div class="routes"><button class="chip" data-nds="" aria-pressed="${S.nds === null}">Ask me when design starts</button><button class="chip" data-nds="skill" aria-pressed="${S.nds === "skill"}">Let the design skill decide</button>${stds.map(s => `<button class="chip" data-nds="${s.id}" aria-pressed="${S.nds === s.id}">${esc(s.name)}</button>`).join("")}</div>
@@ -446,27 +448,53 @@
   function wireNewSubmit() {
     const d = $("#demand"), s = $("#submit");
     d.oninput = () => s.disabled = !d.value.trim();
-    document.querySelectorAll("[data-gr]").forEach(b => b.onclick = () => { const keep = d.value; S.granola = b.dataset.gr === "1"; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
-    document.querySelectorAll("[data-nds]").forEach(b => b.onclick = () => { const v = b.dataset.nds, keep = d.value; S.nds = v === "" ? null : v; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
-    document.querySelectorAll("[data-nfmt]").forEach(b => b.onclick = () => { const v = b.dataset.nfmt, keep = d.value; v ? (S.newFmts.has(v) ? S.newFmts.delete(v) : S.newFmts.add(v)) : S.newFmts.clear(); render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
-    document.querySelectorAll("[data-route]").forEach(b => b.onclick = () => { const v = b.dataset.route, keep = d.value;
+    const refresh = () => { const keep = d.value; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); };
+    const addFiles = files => {
+      const allowed = /\.(pdf|docx|xlsx|pptx|txt|md|csv)$/i;
+      for (const file of files) {
+        if (!allowed.test(file.name)) { toast(`${file.name}: use PDF, DOCX, XLSX, PPTX, TXT, MD or CSV.`); continue; }
+        if (!file.size || file.size > 5 * 1024 * 1024) { toast(`${file.name}: files must be between 1 byte and 5 MB.`); continue; }
+        if (S.demandFiles.some(x => x.name === file.name && x.size === file.size && x.lastModified === file.lastModified)) continue;
+        if (S.demandFiles.length >= 8) { toast("Attach no more than 8 documents."); break; }
+        if (S.demandFiles.reduce((n, x) => n + x.size, 0) + file.size > 10 * 1024 * 1024) { toast("Documents must total 10 MB or less."); continue; }
+        S.demandFiles.push(file);
+      }
+      refresh();
+    };
+    const fileInput = $("#demand-files"), drop = $("#demand-drop");
+    fileInput.onchange = () => { addFiles([...fileInput.files]); fileInput.value = ""; };
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add("dragging"); };
+    drop.ondragleave = () => drop.classList.remove("dragging");
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove("dragging"); addFiles([...e.dataTransfer.files]); };
+    const fileList = $("#demand-file-list");
+    if (fileList) fileList.onclick = e => { const b = e.target.closest("[data-remove-demand-file]"); if (b) { S.demandFiles.splice(+b.dataset.removeDemandFile, 1); refresh(); } };
+    document.querySelectorAll("[data-gr]").forEach(b => b.onclick = () => { S.granola = b.dataset.gr === "1"; refresh(); });
+    document.querySelectorAll("[data-nds]").forEach(b => b.onclick = () => { const v = b.dataset.nds; S.nds = v === "" ? null : v; refresh(); });
+    document.querySelectorAll("[data-nfmt]").forEach(b => b.onclick = () => { const v = b.dataset.nfmt; v ? (S.newFmts.has(v) ? S.newFmts.delete(v) : S.newFmts.add(v)) : S.newFmts.clear(); refresh(); });
+    document.querySelectorAll("[data-route]").forEach(b => b.onclick = () => { const v = b.dataset.route;
       if (!v || v === "plenary") { S.picks.clear(); S.route = v || null; }
-      else { if (S.picks.has(v)) S.picks.delete(v); else S.picks.add(v); S.route = S.picks.size === 0 ? null : S.picks.size === 1 ? [...S.picks][0] : "plenary"; } render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); });
+      else { if (S.picks.has(v)) S.picks.delete(v); else S.picks.add(v); S.route = S.picks.size === 0 ? null : S.picks.size === 1 ? [...S.picks][0] : "plenary"; } refresh(); });
     s.onclick = () => {
       const t = d.value.trim(); if (!t) return;
       if (live) {
-        post("/api/jobs", { title: t, firm: S.route || undefined, firms: S.picks.size > 1 ? [...S.picks] : undefined, formats: [...S.newFmts], design: S.nds, granola: S.granola }).then(async r => {
+        const form = new FormData();
+        form.append("metadata", JSON.stringify({ title: t, firm: S.route || undefined, firms: S.picks.size > 1 ? [...S.picks] : undefined, formats: [...S.newFmts], design: S.nds, granola: S.granola }));
+        S.demandFiles.forEach(file => form.append("files", file, file.name));
+        s.disabled = true; s.textContent = "Sending…";
+        fetch("/api/jobs", { method: "POST", body: form }).then(async r => {
           const j = await r.json();
           if (r.status === 409) { toast(`${j.name}'s charter isn't approved yet. Approve it in Charters first.`); return; }
-          if (!r.ok) { toast("The server refused this demand."); return; }
-          S.newFmts.clear(); S.nds = null; S.route = null; S.picks.clear(); S.tab = "board"; await pull(); render(); toast(`Sent to ${fl(j.firm).name}. Watch it on the board.`);
-        }).catch(() => toast("Could not reach the server."));
+          if (!r.ok) { toast(j.error || "The server refused this demand."); return; }
+          S.newFmts.clear(); S.nds = null; S.route = null; S.picks.clear(); S.demandFiles = []; S.tab = "board"; await pull(); render();
+          toast(`Sent to ${fl(j.firm).name}${j.files ? ` with ${j.files} document${j.files === 1 ? "" : "s"}` : ""}. Watch it on the board.`);
+        }).catch(() => toast("Could not reach the server. Your demand and documents are still here."))
+          .finally(() => { if ($("#submit")) { $("#submit").disabled = !$("#demand").value.trim(); $("#submit").textContent = "Send demand"; } });
         return;
       }
       const id = S.route || (/acqui|invest|back|deal/i.test(t) ? "plenary" : "gtmn-cto");
       const jid = Date.now(), jt = t.length > 70 ? t.slice(0, 70) + "…" : t;
-      jobs.unshift({ id: jid, t: jt, f: id, col: "wait", p: 0 });
-      docs.unshift({ id: "d" + jid, job: jid, name: "Deliverable: " + jt, type: "Report", why: "Produced for this demand.", by: id === "plenary" ? "Plenary Chair" : ag(id, 0), ver: 1, fmts: [...S.newFmts], st: "draft", at: "Today" }); S.newFmts.clear(); S.nds = null;
+      jobs.unshift({ id: jid, t: jt, f: id, col: "wait", p: 0, files: S.demandFiles.map((file, i) => ({ id: i + 1, name: file.name, size: file.size })) });
+      docs.unshift({ id: "d" + jid, job: jid, name: "Deliverable: " + jt, type: "Report", why: "Produced for this demand.", by: id === "plenary" ? "Plenary Chair" : ag(id, 0), ver: 1, fmts: [...S.newFmts], st: "draft", at: "Today" }); S.newFmts.clear(); S.nds = null; S.demandFiles = [];
       say(id, "Front desk", `New demand routed to ${fl(id).name}`);
       S.route = null; S.picks.clear(); S.tab = "board"; render(); toast(`Sent to ${fl(id).name}. You'll see it move on the board.`);
     };
@@ -574,7 +602,7 @@
     let js, cs, lb;
     try { [js, cs, lb] = await Promise.all([getj("/api/jobs"), getj("/api/cards"), getj("/api/library")]); } catch (e) { return; }
     const docOf = job => (lb.docs.find(d => d.job === job) || {}).id;
-    const mapJ = j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, live: 1 });
+    const mapJ = j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, files: j.files || [], live: 1 });
     const sess = js.filter(j => !j.archived && (j.convened || []).length);
     S.convened = [...new Set(sess.flatMap(j => j.convened))].filter(id => byId[id]);
     S.mandate = sess.map(j => j.title).join(" · ");

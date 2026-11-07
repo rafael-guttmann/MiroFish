@@ -67,6 +67,10 @@ class Store:
                 self.db.execute("ALTER TABLE jobs ADD COLUMN model TEXT")
             except sqlite3.OperationalError:
                 pass
+            columns = {row["name"] for row in self.db.execute("PRAGMA table_info(jobs)")}
+            for name in ("brief", "company"):
+                if name not in columns:
+                    self.db.execute(f"ALTER TABLE jobs ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
             self.db.commit()
 
     def run(self, sql, args=()):

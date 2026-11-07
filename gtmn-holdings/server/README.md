@@ -41,7 +41,14 @@ Fable 5.1 and Opus 5.5 were call-tested through the same request path on the liv
 
 ## API
 GET `/api/firms|charters|models|jobs|jobs/:id|cards|library|backup|stream` (SSE), `/api/cost`, `/api/jobs/:id/thread`, `/api/jobs/:id/files/:file_id`, `/api/docs/:id/file?format=PDF|Word|Excel|PowerPoint|JPEG|Markdown|text`, `/api/docs.zip`, `/api/backup.zip`.
-POST `/api/jobs` (`title`, `firm`, `firms`, `formats`, `granola`, `model`; multipart forms may also include up to eight reference documents), `/api/jobs/bulk` (`ids`, `action`: stop|archive|unarchive|delete), `/api/jobs/:id/steer`, `/api/cards/:id/answer`, `/api/charters/:id/review` (approve, edit), `/api/design-systems`, `/api/backup`.
+POST `/api/jobs` (`title`, `brief`, `company`, `firm`, `firms`, `formats`, `granola`, `model`; multipart forms may also include up to eight reference documents), `/api/jobs/bulk` (`ids`, `action`: stop|archive|unarchive|delete), `/api/jobs/:id/steer`, `/api/cards/:id/answer`, `/api/charters/:id/review` (approve, edit), `/api/design-systems`, `/api/backup`.
+
+## Demand organization
+New demands have a short **Title** (required, up to 300 characters), a **Company** (optional, up to 160), and separate **Demand details** (`brief`, required in the form, up to 20,000). Company means the business the work relates to, not the GTMN firm handling it. Existing company names are suggested in the form; whitespace and case variants reuse the first saved spelling. Invalid or overlong values are refused, not silently truncated.
+
+These fields live on `jobs`; deliverables remain linked by job ID rather than duplicating metadata. `/api/library` includes each document's `demand_title`, `company` and `archived` state. Work and Library both support text search and company filtering, including **No company** for older work. Work's bulk selection applies only to visible results; archived demands remain accessible in Work's Archived view and their files remain searchable in the Library.
+
+Existing demands are preserved. Older API clients that omit `brief` use `title` as the instructions; the API and runner apply the same fallback to pre-migration jobs. Every job-bound model call receives the title, company and complete instructions, including research, Plenary, Dani, verification, delivery and revisions. The short title is used for headings and organization, never as a replacement for the full brief.
 
 New-demand reference documents can be PDF, DOCX, XLSX, PPTX, TXT, Markdown or CSV, up to 5 MB each and 10 MB total. Readable text is extracted for the team, while the original is kept with the demand and available to download. Uploaded contents are treated as untrusted evidence, not instructions.
 

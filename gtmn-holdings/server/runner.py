@@ -466,6 +466,13 @@ class AgentSDKRunner(Runner):
              who="", deep=False, model=None, effort=None, include_docs=False, role="work"):
         """One Claude call. The model comes from the job's preset for this role (work, pen or verify)
         unless `model` names one explicitly."""
+        job = self.s.one("SELECT title, brief, company FROM jobs WHERE id=?", (job_id,)) if job_id else None
+        if job:
+            context = f"Demand title: {job['title']}"
+            if job.get("company"):
+                context += f"\nCompany this demand relates to: {job['company']}"
+            context += f"\nFull demand from Rafael:\n{job.get('brief') or job['title']}"
+            user = context + "\n\n---\n\n" + user
         if include_docs:
             excerpts = self._relevant_documents(job_id, user)
             if excerpts:

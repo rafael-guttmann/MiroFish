@@ -52,6 +52,30 @@ class FakeMessages:
 
 
 class RunnerQualityTests(unittest.TestCase):
+    def test_all_callers_receive_title_company_and_full_instructions(self):
+        runner, messages = build_runner()
+        brief = "Use the supplied PD and loss estimates.\n" + "Keep this requirement. " * 40
+        job = {"title": "Credit review", "company": "ZenCredit", "brief": brief, "model": "auto"}
+        with patch.object(runner.s, "one", return_value=job), patch("runner.cost.gate"), patch("runner.cost.record"):
+            for role in ("work", "pen", "verify"):
+                runner._say("System", "Write your response.", job_id=10, role=role, include_docs=True)
+        for call in messages.calls:
+            prompt = call["messages"][0]["content"]
+            self.assertIn("Demand title: Credit review", prompt)
+            self.assertIn("Company this demand relates to: ZenCredit", prompt)
+            self.assertIn(brief, prompt)
+            self.assertIn("Write your response.", prompt)
+            self.assertIn("portfolio.csv", prompt)
+
+    def test_legacy_job_context_falls_back_to_the_original_title(self):
+        runner, messages = build_runner()
+        job = {"title": "Original full demand", "brief": "", "company": "", "model": "auto"}
+        with patch.object(runner.s, "one", return_value=job), patch("runner.cost.gate"), patch("runner.cost.record"):
+            runner._say("System", "Continue.", job_id=10)
+        prompt = messages.calls[0]["messages"][0]["content"]
+        self.assertIn("Full demand from Rafael:\nOriginal full demand", prompt)
+        self.assertNotIn("Company this demand relates to:", prompt)
+
     def test_relevant_documents_excludes_unrelated_uploads(self):
         runner = AgentSDKRunner.__new__(AgentSDKRunner)
         runner.s = FakeStore()

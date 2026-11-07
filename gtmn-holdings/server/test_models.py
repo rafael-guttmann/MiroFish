@@ -190,10 +190,14 @@ class MigrationTests(unittest.TestCase):
             db.close()
             for _ in range(2):
                 store = Store(path)
-                self.assertIn("model", {r["name"] for r in store.rows("PRAGMA table_info(jobs)")})
-            old = store.one("SELECT model FROM jobs WHERE title='Old demand'")
-            self.assertIsNone(old["model"])
-            self.assertEqual(models.roles_for(old["model"]), models.roles_for("auto"))
+                try:
+                    self.assertTrue({"model", "brief", "company"} <= {r["name"] for r in store.rows("PRAGMA table_info(jobs)")})
+                    old = store.one("SELECT * FROM jobs WHERE title='Old demand'")
+                    self.assertEqual((old["title"], old["brief"], old["company"]), ("Old demand", "", ""))
+                    self.assertIsNone(old["model"])
+                    self.assertEqual(models.roles_for(old["model"]), models.roles_for("auto"))
+                finally:
+                    store.db.close()
 
 
 if __name__ == "__main__":

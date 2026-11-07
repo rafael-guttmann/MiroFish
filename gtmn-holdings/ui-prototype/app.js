@@ -10,6 +10,8 @@
 
   let live = false, sig = "";
   const S = { tab: "office", firm: null, agent: null, showAll: false, route: null, picks: new Set(), work: null, workBy: "firm", wmode: false, wsel: new Set(), arch: false, open: new Set(), sel: new Set(), state: {}, task: {}, thread: {}, nds: null, pend: [], lib: "demand", fmtOpen: null, fmtSel: new Set(), newFmts: new Set(), demandFiles: [], granola: true, convened: [] };
+  S.draft = { title: "", company: "", brief: "" }; S.sending = false;
+  S.find = { work: { query: "", company: "" }, library: { query: "", company: "" } };
   FIRMS.forEach(f => f.agents.forEach(a => S.state[f.id + "/" + a.id] = "idle"));
   S.models = null; S.model = (() => { try { return localStorage.getItem("gtmn-model") || ""; } catch (e) { return ""; } })();
   const set = (fid, aid, st, task) => { S.state[fid + "/" + aid] = st; if (task) S.task[fid + "/" + aid] = task; };
@@ -173,19 +175,53 @@
   const LIVE = j => ["wait", "work", "need"].includes(j.col);
   const jc = j => { const r = window.__byJob && window.__byJob[j.id]; return r ? "$" + (r >= 100 ? r.toFixed(0) : r.toFixed(2)) : ""; };
   const jcost = j => jc(j) ? `<span class="jc" title="Estimated spend on this demand">${jc(j)}</span>` : "";
+  const companyKey = name => name ? "company:" + name.toLocaleLowerCase() : "unassigned";
+  const companies = () => [...new Map([...jobs, ...ajobs].filter(j => j.company).map(j => [companyKey(j.company), j.company]))].sort((a, b) => a[1].localeCompare(b[1]));
+  function matchesDemand(j, scope, extra = "") {
+    if (!j) return false;
+    const f = S.find[scope], text = [j.t, j.company, j.brief, extra].join(" ").toLocaleLowerCase();
+    return (!f.company || companyKey(j.company) === f.company) && f.query.trim().toLocaleLowerCase().split(/\s+/).every(word => text.includes(word));
+  }
+  const workList = () => (S.arch ? ajobs : jobs).filter(j => matchesDemand(j, "work"));
+  function findControls(scope, count, total, noun) {
+    const f = S.find[scope], filtered = f.query || f.company;
+    return `<div class="findbar" role="search" aria-label="Find ${scope}">
+      <label class="field" for="${scope}-search">Search ${scope}<input type="search" id="${scope}-search" data-find="${scope}" value="${esc(f.query)}" placeholder="Title, company or keyword" autocomplete="off"></label>
+      <label class="field" for="${scope}-company">Company<select id="${scope}-company" data-company-filter="${scope}"><option value="">All companies</option><option value="unassigned"${f.company === "unassigned" ? " selected" : ""}>No company</option>${companies().map(([key, name]) => `<option value="${esc(key)}"${f.company === key ? " selected" : ""}>${esc(name)}</option>`).join("")}</select></label>
+      ${filtered ? `<button class="chip" data-clear-find="${scope}">Clear filters</button>` : ""}
+      <p class="find-count" role="status">${count} of ${total} ${noun}</p></div>`;
+  }
+  function wireFind() {
+    document.querySelectorAll("[data-find]").forEach(input => {
+      input.oninput = e => {
+        S.find[input.dataset.find].query = input.value;
+        if (input.dataset.find === "work") S.wsel.clear();
+        if (!e.isComposing) render();
+      };
+      input.oncompositionend = () => { S.find[input.dataset.find].query = input.value; render(); };
+    });
+    document.querySelectorAll("[data-company-filter]").forEach(select => {
+      select.onchange = () => {
+        S.find[select.dataset.companyFilter].company = select.value;
+        if (select.dataset.companyFilter === "work") S.wsel.clear();
+        render();
+      };
+    });
+  }
   function work() {
     if (S.work) { const jj = jobOf(S.work); if (jj) return workDetail(jj); S.work = null; }
-    const by = S.workBy, list = S.arch ? ajobs : jobs, c = k => list.filter(j => j.col === k).length;
+    const by = S.workBy, list = workList(), total = (S.arch ? ajobs : jobs).length, c = k => list.filter(j => j.col === k).length;
     const row = j => { const d = detail(j), f = d.f, ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent, on = S.wsel.has(j.id);
-      return `<div class="wr${on ? " on" : ""}">${S.wmode ? `<button class="wck" data-wpick="${j.id}" aria-pressed="${on}" aria-label="Select ${esc(j.t)}">${on ? "✓" : ""}</button>` : ""}<button class="wrow" data-work="${j.id}" style="--a:${ac}"><span class="wt"><b>${esc(j.t)}</b><small>${by === "firm" ? "" : esc(f.name) + " · "}${j.col === "done" ? "Finished" : j.col === "stop" ? "Stopped by you" : j.col === "wait" ? "Queued" : esc(d.now.nm)}</small></span>
+      return `<div class="wr${on ? " on" : ""}">${S.wmode ? `<button class="wck" data-wpick="${j.id}" aria-pressed="${on}" aria-label="Select ${esc(j.t)}">${on ? "✓" : ""}</button>` : ""}<button class="wrow" data-work="${j.id}" style="--a:${ac}"><span class="wt"><b>${esc(j.t)}</b><small>${j.company ? "Company: " + esc(j.company) + " · " : ""}${by === "firm" ? "" : esc(f.name) + " · "}${j.col === "done" ? "Finished" : j.col === "stop" ? "Stopped by you" : j.col === "wait" ? "Queued" : esc(d.now.nm)}</small></span>
       <span class="seg" aria-hidden="true">${d.stages.map(s => `<i class="${s.st}"></i>`).join("")}</span><span class="pc">${Math.round(j.p * 100)}%</span>${jcost(j)}<span class="st ${j.col}">${STL[j.col]}</span></button>${!S.wmode && live && LIVE(j) ? `<button class="wstop" data-wstop="${j.id}" aria-label="Stop ${esc(j.t)}">Stop</button>` : ""}</div>`; };
     const groups = by === "firm" ? [...FIRMS.map(x => [x, list.filter(j => j.f === x.id)]), [PLENARY, list.filter(j => j.f === "plenary")]].filter(g => g[1].length).sort((a, b) => b[1].length - a[1].length || 0)
       : ["need", "work", "wait", "stop", "done"].map(k => [{ name: STL[k], accent: "#16181D" }, list.filter(j => j.col === k)]).filter(g => g[1].length);
     return `${header("Work", "What every firm is doing. Tap one to go deeper.")}
+    ${findControls("work", list.length, total, "demands")}
     <div class="wsum"><div><b>${c("work")}</b><small>working</small></div><div><b class="n">${c("need")}</b><small>need you</small></div><div><b>${c("wait")}</b><small>waiting</small></div><div><b>${c("done")}</b><small>done</small></div></div>
     <div class="routes" style="margin-bottom:14px"><button class="chip" data-wby="firm" aria-pressed="${by === "firm"}">By firm</button><button class="chip" data-wby="status" aria-pressed="${by === "status"}">By status</button>${live ? `<span class="wsp"></span><button class="chip" data-warch="1" aria-pressed="${S.arch}">Archived · ${ajobs.length}</button><button class="chip" data-wmode="1" aria-pressed="${S.wmode}">${S.wmode ? "Cancel" : "Select"}</button>` : ""}</div>
     ${S.wmode ? `<div class="wbar" role="toolbar"><b>${S.wsel.size} selected</b><button data-wall="1">${S.wsel.size === list.length ? "Clear" : "Select all"}</button><span class="wsp"></span><button data-wact="stop" ${[...S.wsel].some(i => { const q = jobOf(i); return q && LIVE(q); }) ? "" : "disabled"}>Stop</button><button data-wact="${S.arch ? "unarchive" : "archive"}" ${S.wsel.size ? "" : "disabled"}>${S.arch ? "Unarchive" : "Archive"}</button><button class="danger" data-wact="delete" ${S.wsel.size ? "" : "disabled"}>Delete</button></div>` : ""}
-    ${S.arch && !list.length ? `<p class="sub">Nothing archived.</p>` : ""}${groups.map(([g, l]) => `<section class="wgroup"><h2><i style="background:${g.accent === "#FFFFFF" ? "#16181D" : g.accent}"></i>${esc(g.name)} · ${l.length}</h2>${l.map(row).join("")}</section>`).join("")}`;
+    ${!list.length ? `<p class="sub">${S.find.work.query || S.find.work.company ? "No demands match. Try another title or company, or clear the filters." : S.arch ? "Nothing archived." : "No demands yet. Start one in New demand."}</p>` : ""}${groups.map(([g, l]) => `<section class="wgroup"><h2><i style="background:${g.accent === "#FFFFFF" ? "#16181D" : g.accent}"></i>${esc(g.name)} · ${l.length}</h2>${l.map(row).join("")}</section>`).join("")}`;
   }
   function ring(p, ac) { const r = 42, c = 2 * Math.PI * r; return `<svg class="ring" viewBox="0 0 100 100" role="img" aria-label="${Math.round(p * 100)} percent complete"><circle cx="50" cy="50" r="${r}" fill="none" stroke="#E3DFD6" stroke-width="10"/><circle cx="50" cy="50" r="${r}" fill="none" stroke="${ac}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c * p} ${c}" transform="rotate(-90 50 50)"/><text x="50" y="55" text-anchor="middle" font-size="22" font-weight="700" fill="#16181D">${Math.round(p * 100)}%</text></svg>`; }
   function workDetail(j) {
@@ -195,6 +231,8 @@
     return `<div class="crumbs"><button data-wback="1">Work</button> / ${esc(j.t)}</div>
     <div class="wdet" style="--a:${ac}">
       <div class="whead"><div><span class="st ${j.col}">${STL[j.col]}</span>${live && LIVE(j) ? `<button class="wstop" data-wstop="${j.id}">Stop work</button>` : ""}<h1>${esc(j.t)}</h1><p class="sub">${esc(f.name)}${j.col !== "done" && j.col !== "wait" && j.col !== "stop" ? " · now: " + esc(d.now.nm) : ""}${jcost(j) ? ` · spent <b>${jc(j)}</b> so far` : ""}</p>${modelLine(j)}</div>${ring(j.p, ac)}</div>
+      <p class="company-line">Company: <b>${esc(j.company || "Not specified")}</b>${ajobs.includes(j) ? " · Archived" : ""}</p>
+      <details class="demand-brief"><summary>Original demand</summary><p>${esc(j.brief || j.t)}</p></details>
       ${card ? `<button class="needbar" data-goneeds="1"><b>${esc(card.agent)} is waiting for you</b><span>${esc(card.q)}</span><em>Answer →</em></button>` : ""}
       <h2>Progress</h2>
       <ol class="steps">${d.stages.map((s, i) => `<li class="${s.st}"><i>${s.st === "done" ? "✓" : i + 1}</i><span>${esc(s.nm)}</span></li>`).join("")}</ol>
@@ -256,7 +294,7 @@
   }
   function drawThread(j) { const el = $("#thread"); if (!el) return; const t = thr(j); el.innerHTML = t.length ? t.map(m => msgHtml(m, j)).join("") : EMPTY; el.scrollTop = el.scrollHeight; }
   function wireWork() {
-    const j = jobs.find(x => x.id === S.work); if (!j) return;
+    const j = jobOf(S.work); if (!j) return;
     syncThread(j);
     const n = $("#snote"), s = $("#ssend"), f = $("#sfile"), p = $("#pend");
     const upd = () => { s.disabled = !(n.value.trim() || S.pend.length); p.innerHTML = S.pend.map((x, i) => `<span class="fchip">${esc(x)} <button data-unpend="${i}" aria-label="Remove">×</button></span>`).join(""); };
@@ -273,8 +311,9 @@
   const dl = (d, fmt) => { if (live && /^d\d+$/.test(d.id)) { const a = document.createElement("a"); a.href = `/api/docs/${d.id.slice(1)}/file?format=${fmt}`; document.body.appendChild(a); a.click(); a.remove(); return toast("Downloading " + fmt); } const ext = FMT[fmt], nm = `${d.name.replace(/[^\w]+/g, "-")}-v${d.ver}.${ext}`; const b = new Blob([`GTMN Holdings sample file\n${d.name}\nVersion ${d.ver}\nFormat: ${fmt}\nThis is a prototype placeholder.`], { type: "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = nm; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 500); toast("Downloading " + nm); };
   const fmtPicker = d => `<div class="fpick"><b>Which formats?</b><div class="fchips">${Object.keys(FMT).map(k => `<button class="chip" data-fmt="${k}" aria-pressed="${S.fmtSel.has(k)}">${k}</button>`).join("")}</div><button class="submit sm" data-fmtok="${d.id}" ${S.fmtSel.size ? "" : "disabled"}>${d.fmts.length ? "Add formats" : "Confirm"}</button></div>`;
   function docRow(d) {
-    const j = jobs.find(x => x.id === d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
+    const j = jobOf(d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
     return `<div class="doc" style="--a:${ac}"><div class="dico">${esc(d.type.slice(0, 1))}</div><div class="dmain"><b>${esc(d.name)} <em>v${d.ver}${d.st === "draft" ? " · draft" : ""}</em></b>
+      ${S.tab === "lib" && S.lib === "firm" ? `<small>Demand: ${esc(j.t)} · Company: ${esc(j.company || "Not specified")}${ajobs.includes(j) ? " · Archived" : ""}</small>` : ""}
       <small>${esc(d.type)} · from ${esc(f.name)}, ${esc(d.by)} · ${d.at}</small><p>${esc(d.why)}</p>
       <div class="dfm"><button class="chip pvb" data-pv="${d.id}">Preview</button>${d.fmts.length ? d.fmts.map(k => `<button class="chip dlb" data-dl="${d.id}:${k}">↓ ${k}</button>`).join("") : `<span class="ask">Format not chosen yet</span>`}<button class="chip ghostc" data-fmtopen="${d.id}">${d.fmts.length ? "+ Another format" : "Choose formats"}</button></div>
       ${S.fmtOpen === d.id ? fmtPicker(d) : ""}
@@ -288,13 +327,15 @@
   const bkLoad = () => live && getj("/api/backup").then(x => { bk = x; if (S.tab === "lib") render(); }).catch(() => {});
   function library() {
     if (S.lib === "design") return designRepo();
-    const by = S.lib, groups = new Map();
-    docs.forEach(d => { const j = jobs.find(x => x.id === d.job), k = by === "demand" ? j.id : j.f; (groups.get(k) || groups.set(k, []).get(k)).push(d); });
+    const by = S.lib, groups = new Map(), list = docs.filter(d => matchesDemand(jobOf(d.job), "library", [d.name, d.type, d.why].join(" ")));
+    list.forEach(d => { const j = jobOf(d.job), k = by === "demand" ? j.id : j.f; (groups.get(k) || groups.set(k, []).get(k)).push(d); });
     return `<div class="libwrap"><h1>Library</h1><p class="sub">Everything the firms produce, saved in one place, backed up, and sorted by the demand it came from.</p>
       <div class="bkbar"><b>${bk ? (bk.last ? "✓ Backed up" : "No backup yet") : "✓ All " + docs.length + " files backed up"}</b><span>${bk ? (bk.last ? "Last backup " + new Date(bk.last.at * 1000).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + ". " : "") + "Saved in the vault and backed up every night at 02:00" + (bk.second ? ", in " + bk.locations.length + " places." : ". Tap Backup copy to keep one off this server.") : "Saved to the vault and copied every night to a second location. Last backup 14:02."}</span>${bk ? '<button class="chip" data-bknow="1">Back up now</button><button class="chip" data-bkdl="1">↓ Backup copy</button>' : ""}<button class="chip" data-dlall="1">↓ Download everything</button></div>
       <div class="wtoggle"><button class="chip" data-libby="demand" aria-pressed="${by === "demand"}">By demand</button><button class="chip" data-libby="firm" aria-pressed="${by === "firm"}">By firm</button><button class="chip" data-libby="design" aria-pressed="${by === "design"}">Design systems</button></div>
-      ${[...groups].map(([k, l]) => { const j = by === "demand" ? jobs.find(x => x.id === k) : null, f = fl(by === "demand" ? j.f : k), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
-        return `<section class="lgrp" style="--a:${ac}"><div class="lh"><h2>${esc(by === "demand" ? j.t : f.name)}</h2><small>${by === "demand" ? esc(f.name) + " · " + STL[j.col] : l.length + " files"}</small></div>${l.map(docRow).join("")}</section>`; }).join("")}
+      ${findControls("library", list.length, docs.length, "files")}
+      ${!list.length ? `<p class="sub">${S.find.library.query || S.find.library.company ? "No files match. Try another title or company, or clear the filters." : "No deliverables yet. Files appear here when the firms produce them."}</p>` : ""}
+      ${[...groups].map(([k, l]) => { const j = by === "demand" ? jobOf(k) : null, f = fl(by === "demand" ? j.f : k), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent;
+        return `<section class="lgrp" style="--a:${ac}"><div class="lh"><h2>${esc(by === "demand" ? j.t : f.name)}</h2><small>${by === "demand" ? "Company: " + esc(j.company || "Not specified") + " · " + esc(f.name) + " · " + STL[j.col] + (ajobs.includes(j) ? " · Archived" : "") : l.length + " files"}</small></div>${l.map(docRow).join("")}</section>`; }).join("")}
 </div>`;
   }
 
@@ -344,7 +385,12 @@
   function newDemand() {
     const note = S.route === null ? "The front desk will pick the right firm, or call a Plenary if it needs several." : S.picks.size > 1 ? `Plenary will convene exactly these ${S.picks.size} firms: ${[...S.picks].map(i => esc(byId[i].name)).join(", ")}.` : S.route === "plenary" ? "Plenary will convene the firms that fit and run it as one working group." : `Goes straight to ${esc(byId[S.route].name)}.`;
     return `<div class="form"><h1>What do you need?</h1><p class="sub" style="margin-bottom:20px">Write it like a note to a colleague. They'll ask if they need more.</p>
-      <textarea class="big" id="demand" placeholder="For example: Should we acquire a Brazilian payments company at a 6x revenue multiple?"></textarea>
+      <div class="demand-meta">
+        <label class="field" for="demand-title">Title<input id="demand-title" maxlength="300" required value="${esc(S.draft.title)}" placeholder="For example: Q4 portfolio review" aria-describedby="title-help"><small id="title-help">A short name to find this work later.</small></label>
+        <label class="field" for="demand-company">Company <span class="optional">(optional)</span><input id="demand-company" list="company-names" maxlength="160" value="${esc(S.draft.company)}" placeholder="Choose or type a company" aria-describedby="company-help"><small id="company-help">The company this work is about, not the firm doing it.</small></label>
+        <datalist id="company-names">${companies().map(([, name]) => `<option value="${esc(name)}"></option>`).join("")}</datalist>
+      </div>
+      <label class="field" for="demand">Demand details<textarea class="big" id="demand" maxlength="20000" required placeholder="For example: Should we acquire a Brazilian payments company at a 6x revenue multiple?">${esc(S.draft.brief)}</textarea></label>
       <div class="drop" id="demand-drop">Drop documents here or <label style="text-decoration:underline;cursor:pointer">choose files<input type="file" id="demand-files" accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv" multiple hidden></label><small>PDF, Word, Excel, PowerPoint, text, Markdown or CSV · 5 MB each, 10 MB total</small></div>
       ${S.demandFiles.length ? `<div class="demand-files" id="demand-file-list" aria-live="polite">${S.demandFiles.map((file, i) => `<span class="fchip">${esc(file.name)} <button type="button" data-remove-demand-file="${i}" aria-label="Remove ${esc(file.name)}">×</button></span>`).join("")}</div>` : ""}
       <h2 style="margin-top:20px">Deliverable format</h2><div class="routes"><button class="chip" data-nfmt="" aria-pressed="${!S.newFmts.size}">Ask me when it's ready</button>${Object.keys(FMT).map(k => `<button class="chip" data-nfmt="${k}" aria-pressed="${S.newFmts.has(k)}">${k}</button>`).join("")}</div>
@@ -491,6 +537,8 @@
 
   function render() {
     const m = $("#main");
+    const active = document.activeElement, findFocus = active && active.matches(".findbar input, .findbar select");
+    const focus = findFocus ? { id: active.id, start: active.selectionStart, end: active.selectionEnd, scroll: m.scrollTop } : null;
     if (S.tab === "lib" && live && !bkAsked) { bkAsked = 1; bkLoad(); }
     m.innerHTML = { office, floor, board: work, lib: library, charters, needs, new: newDemand }[S.tab]();
     document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === S.tab));
@@ -500,6 +548,13 @@
     if (S.tab === "needs") wireNeeds();
     if (S.tab === "new") wireNew();
     if (S.tab === "board" && S.work) wireWork();
+    wireFind();
+    if (focus && document.getElementById(focus.id)) {
+      const field = document.getElementById(focus.id);
+      field.focus({ preventScroll: true });
+      if (focus.start != null) field.setSelectionRange(focus.start, focus.end);
+      m.scrollTop = focus.scroll;
+    }
     if (S.tab === "lib") { const sf = $("#stdfile"); if (sf) sf.onchange = () => { [...sf.files].forEach(x => stds.push({ id: "s" + Date.now() + x.name, name: x.name, kind: "File", scope: "All firms", at: "Today" })); toast("Saved to Design systems."); render(); };
       const go = $("#slinkgo"); if (go) go.onclick = () => { const v = $("#slink").value.trim(); if (!/^https:\/\//.test(v)) { toast("Paste a link that starts with https://"); return; } if (live) post("/api/design-systems", { name: v.replace(/^https:\/\//, "").slice(0, 40), url: v }); stds.push({ id: "s" + Date.now(), name: v.replace(/^https:\/\//, "").slice(0, 40), kind: "Link", url: v, scope: "All firms", at: "Today" }); toast("Link saved to Design systems."); render(); }; }
   }
@@ -525,9 +580,15 @@
   }
   function wireNew() { wireNewSubmit(); wireModel(); }
   function wireNewSubmit() {
-    const d = $("#demand"), s = $("#submit");
-    d.oninput = () => s.disabled = !d.value.trim();
-    const refresh = () => { const keep = d.value; render(); $("#demand").value = keep; $("#submit").disabled = !keep.trim(); };
+    const d = $("#demand"), title = $("#demand-title"), company = $("#demand-company"), s = $("#submit");
+    const sync = () => {
+      S.draft = { title: title.value, company: company.value, brief: d.value };
+      s.disabled = S.sending || !title.value.trim() || !d.value.trim();
+      s.textContent = S.sending ? "Sending…" : "Send demand";
+    };
+    [d, title, company].forEach(field => field.oninput = sync);
+    sync();
+    const refresh = () => { sync(); render(); };
     const addFiles = files => {
       const allowed = /\.(pdf|docx|xlsx|pptx|txt|md|csv)$/i;
       for (const file of files) {
@@ -554,27 +615,31 @@
       if (!v || v === "plenary") { S.picks.clear(); S.route = v || null; }
       else { if (S.picks.has(v)) S.picks.delete(v); else S.picks.add(v); S.route = S.picks.size === 0 ? null : S.picks.size === 1 ? [...S.picks][0] : "plenary"; } refresh(); });
     s.onclick = () => {
-      const t = d.value.trim(); if (!t) return;
+      sync();
+      const t = title.value.trim(), brief = d.value.trim(), co = company.value.trim();
+      if (!t || !brief || S.sending) return;
       if (live) {
         const form = new FormData();
-        form.append("metadata", JSON.stringify({ title: t, firm: S.route || undefined, firms: S.picks.size > 1 ? [...S.picks] : undefined, formats: [...S.newFmts], design: S.nds, granola: S.granola, model: modelPick() }));
+        form.append("metadata", JSON.stringify({ title: t, brief, company: co, firm: S.route || undefined, firms: S.picks.size > 1 ? [...S.picks] : undefined, formats: [...S.newFmts], design: S.nds, granola: S.granola, model: modelPick() }));
         S.demandFiles.forEach(file => form.append("files", file, file.name));
-        s.disabled = true; s.textContent = "Sending…";
+        S.sending = true; sync();
         fetch("/api/jobs", { method: "POST", body: form }).then(async r => {
           const j = await r.json();
           if (r.status === 409) { toast(`${j.name}'s charter isn't approved yet. Approve it in Charters first.`); return; }
           if (!r.ok) { toast(j.error || "The server refused this demand."); if (r.status === 400 && /model/i.test(j.error || "")) loadModels(true).then(paintModel); return; }
-          S.newFmts.clear(); S.nds = null; S.route = null; S.picks.clear(); S.demandFiles = []; S.tab = "board"; await pull(); render();
+          S.newFmts.clear(); S.nds = null; S.route = null; S.picks.clear(); S.demandFiles = []; S.draft = { title: "", company: "", brief: "" };
+          S.find.work = { query: "", company: "" }; S.arch = false; S.work = null; S.wsel.clear(); S.tab = "board"; await pull(); render();
           toast(`Sent to ${fl(j.firm).name}${j.files ? ` with ${j.files} document${j.files === 1 ? "" : "s"}` : ""}. Watch it on the board.`);
         }).catch(() => toast("Could not reach the server. Your demand and documents are still here."))
-          .finally(() => { if ($("#submit")) { $("#submit").disabled = !$("#demand").value.trim(); $("#submit").textContent = "Send demand"; } });
+          .finally(() => { S.sending = false; if ($("#submit")) { $("#submit").disabled = !$("#demand-title").value.trim() || !$("#demand").value.trim(); $("#submit").textContent = "Send demand"; } });
         return;
       }
-      const id = S.route || (/acqui|invest|back|deal/i.test(t) ? "plenary" : "gtmn-cto");
-      const jid = Date.now(), jt = t.length > 70 ? t.slice(0, 70) + "…" : t;
-      jobs.unshift({ id: jid, t: jt, f: id, col: "wait", p: 0, files: S.demandFiles.map((file, i) => ({ id: i + 1, name: file.name, size: file.size })) });
+      const id = S.route || (/acqui|invest|back|deal/i.test(t + " " + brief) ? "plenary" : "gtmn-cto");
+      const jid = Date.now(), jt = t;
+      jobs.unshift({ id: jid, t: jt, company: co, brief, f: id, col: "wait", p: 0, files: S.demandFiles.map((file, i) => ({ id: i + 1, name: file.name, size: file.size })) });
       docs.unshift({ id: "d" + jid, job: jid, name: "Deliverable: " + jt, type: "Report", why: "Produced for this demand.", by: id === "plenary" ? "Plenary Chair" : ag(id, 0), ver: 1, fmts: [...S.newFmts], st: "draft", at: "Today" }); S.newFmts.clear(); S.nds = null; S.demandFiles = [];
       say(id, "Front desk", `New demand routed to ${fl(id).name}`);
+      S.draft = { title: "", company: "", brief: "" }; S.find.work = { query: "", company: "" }; S.arch = false; S.work = null;
       S.route = null; S.picks.clear(); S.tab = "board"; render(); toast(`Sent to ${fl(id).name}. You'll see it move on the board.`);
     };
   }
@@ -583,6 +648,7 @@
   document.addEventListener("click", e => {
     const t = e.target.closest("button"); if (!t) return;
     if (t.dataset.chopen) { S.chOpen = S.chOpen === t.dataset.chopen ? null : t.dataset.chopen; const y = $("#main").scrollTop; render(); $("#main").scrollTop = y; return; }
+    if (t.dataset.clearFind) { const scope = t.dataset.clearFind; S.find[scope] = { query: "", company: "" }; if (scope === "work") S.wsel.clear(); render(); $("#" + scope + "-search").focus(); return; }
     if (t.dataset.applych) { applyChanges(); return; }
     if (t.dataset.chrev) { const [i, d] = t.dataset.chrev.split(":"); review(i, d); return; }
     if (t.dataset.tab) { S.fmtOpen = null; S.tab = t.dataset.tab; if (S.tab === "board") S.work = null; if (S.tab === "office") { S.firm = null; S.agent = null; } render(); }
@@ -594,7 +660,7 @@
     else if (t.dataset.wmode) { S.wmode = !S.wmode; S.wsel = new Set(); render(); }
     else if (t.dataset.warch) { S.arch = !S.arch; S.wsel = new Set(); render(); }
     else if (t.dataset.wpick) { const i = +t.dataset.wpick; S.wsel.has(i) ? S.wsel.delete(i) : S.wsel.add(i); render(); }
-    else if (t.dataset.wall) { const l = S.arch ? ajobs : jobs; S.wsel = S.wsel.size === l.length ? new Set() : new Set(l.map(j => j.id)); render(); }
+    else if (t.dataset.wall) { const l = workList(); S.wsel = S.wsel.size === l.length ? new Set() : new Set(l.map(j => j.id)); render(); }
     else if (t.dataset.wstop) { jobsAct([+t.dataset.wstop], "stop"); }
     else if (t.dataset.wact) { jobsAct([...S.wsel], t.dataset.wact); }
     else if (t.dataset.work && S.wmode) { const i = +t.dataset.work; S.wsel.has(i) ? S.wsel.delete(i) : S.wsel.add(i); render(); }
@@ -608,7 +674,7 @@
     else if (t.dataset.pvk) pvOpen(S.pv.id, t.dataset.pvk);
     else if (t.dataset.pvx) pvClose();
     else if (t.dataset.pvdl) { const [id, k] = t.dataset.pvdl.split(":"), d = docs.find(x => x.id === id); if (d.fmts.includes(k) || (live && /^d\d+$/.test(d.id))) dl(d, k); else { d.fmts.push(k); toast(`Asked the desk to also make it in ${k}.`); } pvOpen(id, k); }
-    else if (t.dataset.pvsteer) { const jid = +t.dataset.pvsteer; pvClose(); S.tab = "board"; S.work = jid; S.open = new Set([jid + ":" + detail(jobs.find(j => j.id === jid)).cur]); render(); $("#main").scrollTop = 0; }
+    else if (t.dataset.pvsteer) { const jid = +t.dataset.pvsteer; pvClose(); S.tab = "board"; S.work = jid; S.open = new Set([jid + ":" + detail(jobOf(jid)).cur]); render(); $("#main").scrollTop = 0; }
     else if (t.dataset.dl) { const [id, k] = t.dataset.dl.split(":"); dl(docs.find(x => x.id === id), k); }
     else if (t.dataset.bkdl) { toast("Preparing your backup…"); location.href = "/api/backup.zip"; }
     else if (t.dataset.bknow) { toast("Backing up…"); post("/api/backup", {}).then(r => { toast(r && r.name ? "Backup saved: " + r.files + " files" : "Backup failed"); bkLoad(); }); }
@@ -636,7 +702,7 @@
     }).catch(() => {});
   }
   function pvBody(d, k) {
-    const j = jobs.find(x => x.id === d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent, S4 = pvSec(d);
+    const j = jobOf(d.job), f = fl(j.f), ac = f.accent === "#FFFFFF" ? "#16181D" : f.accent, S4 = pvSec(d);
     if (k === "PowerPoint") return `<div class="pv-slides">${[["", d.name, f.name + " · " + d.at], ...S4.map(s => [s[0], s[1], ""])].map((s, i) => `<div class="pv-slide" style="--a:${ac}"><small>${i + 1}</small>${s[0] ? `<h4>${esc(s[0])}</h4>` : ""}<b>${esc(s[1])}</b>${s[2] ? `<p>${esc(s[2])}</p>` : ""}</div>`).join("")}</div>`;
     if (k === "Excel") return `<div class="pv-sheet"><table><thead><tr><th></th><th>Item</th><th>Base</th><th>Low</th><th>High</th></tr></thead><tbody>${["Revenue", "Costs", "Margin", "Capital needed", "Payback (months)"].map((r, i) => `<tr><td>${i + 1}</td><td>${r}</td><td>${(100 + i * 37) % 180}</td><td>${(60 + i * 29) % 120}</td><td>${(140 + i * 41) % 220}</td></tr>`).join("")}</tbody></table><p class="pv-n">Sample figures only. The real file carries the assumption register.</p></div>`;
     if (k === "Markdown") return `<div class="pv-page"><pre class="pv-md">${esc("# " + d.name + "\n\n## Summary\n" + d.why + "\n\n## Recommendation\n...")}</pre></div>`;
@@ -681,12 +747,13 @@
     let js, cs, lb;
     try { [js, cs, lb] = await Promise.all([getj("/api/jobs"), getj("/api/cards"), getj("/api/library")]); } catch (e) { return; }
     const docOf = job => (lb.docs.find(d => d.job === job) || {}).id;
-    const mapJ = j => ({ id: j.id, t: j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, files: j.files || [], live: 1, mn: j.model_name || null, ran: j.ran_on || [] });
+    const mapJ = j => ({ id: j.id, t: j.title, company: j.company || "", brief: j.brief || j.title, f: j.firm, col: COL[j.status] || "wait", p: j.progress, files: j.files || [], live: 1, mn: j.model_name || null, ran: j.ran_on || [] });
     const sess = js.filter(j => !j.archived && (j.convened || []).length);
     S.convened = [...new Set(sess.flatMap(j => j.convened))].filter(id => byId[id]);
     S.mandate = sess.map(j => j.title).join(" · ");
     S.sess = sess.map(j => ({ id: j.id, title: j.title, firms: j.convened.filter(id => byId[id]) }));
     jobs = js.filter(j => !j.archived).map(mapJ); ajobs = js.filter(j => j.archived).map(mapJ);
+    S.wsel = new Set([...S.wsel].filter(id => workList().some(j => j.id === id)));
     cards = cs.map(c => { const p = c.payload, f = byId[c.firm]; return { id: "c" + c.id, srv: c.id, job: c.job, firm: c.firm, agent: f ? f.agents[0].name : "Plenary Chair", kind: p.kind, q: p.q, opts: p.opts, why: p.why, def: p.def, fmtDoc: p.q.startsWith("Which formats") ? "d" + docOf(c.job) : undefined }; });
     docs = lb.docs.map(d => ({ id: "d" + d.id, job: d.job, name: d.name, type: d.kind, why: d.why || "Produced for this demand.", by: agName(d.by), ver: d.version, fmts: JSON.parse(d.formats || "[]"), st: "final", at: when(d.created) }));
     if (lb.design_systems.length) stds = lb.design_systems.map(s => ({ id: "s" + s.id, name: s.name, kind: s.kind === "link" ? "Link" : "File", url: s.url, def: s.is_default, scope: "All firms", at: when(s.created) }));
@@ -694,7 +761,7 @@
     jobs.forEach(j => { const f = byId[j.f]; if (!f || (j.col !== "work" && j.col !== "need")) return; f.agents.slice(0, 4).forEach(a => { S.state[f.id + "/" + a.id] = j.col === "need" ? "asking" : "working"; S.task[f.id + "/" + a.id] = "Working on: " + j.t; }); });
     const s = JSON.stringify([jobs, ajobs, cards, docs, stds]);
     if (s === sig) return; sig = s;
-    const ae = document.activeElement, typing = ae && /TEXTAREA|INPUT/.test(ae.tagName);
+    const ae = document.activeElement, typing = ae && /TEXTAREA|INPUT|SELECT/.test(ae.tagName);
     if (!typing && ["office", "board", "needs", "lib"].includes(S.tab)) keep(); else { updCb(); renderAside(); const b = $("#badge"); b.textContent = cards.length || ""; b.dataset.n = cards.length; }
   }
   async function goLive() {

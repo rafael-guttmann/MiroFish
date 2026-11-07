@@ -156,6 +156,21 @@ h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color
 
 /* new demand */
 .form{max-width:640px;margin:0 auto}
+.field{display:block;min-width:0;font-size:14px;font-weight:600;color:var(--ink)}
+.field input,.field select{display:block;width:100%;min-width:0;min-height:44px;margin-top:6px;border:1.5px solid var(--line2);border-radius:10px;padding:10px 12px;background:var(--card);font:400 16px/1.4 var(--sans);color:var(--ink)}
+.field input::placeholder,.field textarea::placeholder{color:var(--ink2);opacity:1}
+.field small{display:block;margin-top:6px;font-size:12px;font-weight:400;color:var(--ink2)}
+.field .optional{font-weight:400;color:var(--ink2)}
+.field .big{display:block;margin-top:6px;font-weight:400}
+.demand-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.findbar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;margin:18px 0}
+.findbar .field{flex:1 1 200px}.findbar .field:first-child{flex-grow:2}
+.findbar .chip{min-height:44px}.find-count{flex-basis:100%;font-size:13px;color:var(--ink2)}
+.company-line{font-size:14px;color:var(--ink2);overflow-wrap:anywhere}
+.demand-brief{margin:12px 0 20px;font-size:14px}.demand-brief summary{cursor:pointer;font-weight:600}
+.demand-brief p{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:10px;color:var(--ink2)}
+.wt,.whead>div{min-width:0}.wt,.whead h1,.lh h2,.dmain{overflow-wrap:anywhere}
+@media(max-width:760px){.demand-meta{grid-template-columns:1fr}.findbar .field{flex-basis:100%}}
 .big{width:100%;min-height:180px;border:1.5px solid var(--line2);border-radius:16px;padding:18px;background:#fff;resize:vertical;font-size:17px;line-height:1.5;outline:0}
 .big:focus{border-color:var(--ink)}
 .routes{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 6px}
@@ -394,6 +409,6 @@ button.mbtn:hover{border-color:var(--ink2)}
 <script src="charters.js"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}))</script>
 <script src="floor.js?v=24"></script>
-<script src="app.js?v=47"></script>
+<script src="app.js?v=48"></script>
 </body>
 </html>

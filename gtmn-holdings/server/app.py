@@ -234,6 +234,7 @@ class H(BaseHTTPRequestHandler):
             for u in store.rows("SELECT job, model, SUM(usd) AS usd FROM usage WHERE job IS NOT NULL GROUP BY job, model"):
                 used.setdefault(u["job"], []).append(u)
             for j in js:
+                j["brief"] = j["brief"] or j["title"]
                 j["files"] = store.rows("SELECT id,name,mime,size,created FROM job_files WHERE job=? ORDER BY id", (j["id"],))
                 ev = store.one("SELECT text FROM events WHERE job=? AND kind='convened' ORDER BY id DESC", (j["id"],)) if j["firm"] == "plenary" else None
                 j["convened"] = ev["text"].split(",") if ev and j["status"] in ("working", "asking") else []
@@ -262,6 +263,7 @@ class H(BaseHTTPRequestHandler):
             j = store.one("SELECT * FROM jobs WHERE id=?", (m[1],))
             if not j:
                 return self.send(404, {"error": "not found"})
+            j["brief"] = j["brief"] or j["title"]
             j["events"] = store.rows("SELECT * FROM events WHERE job=? ORDER BY id", (m[1],))
             j["docs"] = store.rows("SELECT * FROM docs WHERE job=?", (m[1],))
             j["files"] = store.rows("SELECT id,name,mime,size,created FROM job_files WHERE job=? ORDER BY id", (m[1],))
@@ -274,7 +276,9 @@ class H(BaseHTTPRequestHandler):
                 c["payload"] = json.loads(c["payload"])
             return self.send(200, cs)
         if p == "/api/library":
-            return self.send(200, {"docs": store.rows("SELECT * FROM docs ORDER BY id DESC"),
+            return self.send(200, {"docs": store.rows(
+                                       "SELECT docs.*, jobs.title AS demand_title, jobs.company, jobs.archived "
+                                       "FROM docs JOIN jobs ON jobs.id=docs.job ORDER BY docs.id DESC"),
                                    "design_systems": store.rows("SELECT * FROM design_systems ORDER BY id")})
         m = re.fullmatch(r"/api/docs/(\d+)/file", p)
         if m:
@@ -330,11 +334,29 @@ class H(BaseHTTPRequestHandler):
         except (json.JSONDecodeError, UnicodeDecodeError):
             return self.send(400, {"error": "Demand details are not valid JSON."})
         if p == "/api/jobs":
-            title = str(b.get("title", "")).strip()[:300]
+            if not isinstance(b, dict):
+                return self.send(400, {"error": "Demand details must be an object."})
+            values = {}
+            for field, limit in (("title", 300), ("brief", 20000), ("company", 160)):
+                value = b.get(field, b.get("title", "") if field == "brief" else "")
+                if not isinstance(value, str):
+                    return self.send(400, {"error": f"{field.capitalize()} must be text."})
+                value = value.strip() if field == "brief" else " ".join(value.split())
+                if len(value) > limit:
+                    return self.send(400, {"error": f"{field.capitalize()} must be {limit:,} characters or fewer."})
+                values[field] = value
+            title, brief, company = (values[k] for k in ("title", "brief", "company"))
             if not title:
-                return self.send(400, {"error": "title required"})
+                return self.send(400, {"error": "Add a title for this demand."})
+            if not brief:
+                return self.send(400, {"error": "Describe what you need in the demand details."})
+            if company:
+                for row in store.rows("SELECT company FROM jobs WHERE company!='' GROUP BY company ORDER BY MIN(id)"):
+                    if row["company"].casefold() == company.casefold():
+                        company = row["company"]
+                        break
             fmts = [f for f in b.get("formats", []) if f in FORMATS]
-            firm = "plenary" if len([f for f in b.get("firms", []) if f in charters]) > 1 else route_firm(title, b.get("firm"))
+            firm = "plenary" if len([f for f in b.get("firms", []) if f in charters]) > 1 else route_firm(title + "\n" + brief, b.get("firm"))
             if firm in charters and not approved(firm):
                 return self.send(409, {"error": "charter not approved", "firm": firm, "name": charters[firm]["name"]})
             picks = [f for f in b.get("firms", []) if f in charters] if firm == "plenary" else []
@@ -348,8 +370,8 @@ class H(BaseHTTPRequestHandler):
                 preset = models.validate(b.get("model"), runner.available_models())
             except ValueError as e:
                 return self.send(400, {"error": str(e)})
-            jid = store.run("INSERT INTO jobs(title,firm,formats,design,created,granola,model) VALUES(?,?,?,?,?,?,?)",
-                            (title, firm, json.dumps(fmts), b.get("design"), time.time(), 0 if b.get("granola") is False else 1, preset))
+            jid = store.run("INSERT INTO jobs(title,brief,company,firm,formats,design,created,granola,model) VALUES(?,?,?,?,?,?,?,?,?)",
+                            (title, brief, company, firm, json.dumps(fmts), b.get("design"), time.time(), 0 if b.get("granola") is False else 1, preset))
             saved = []
             try:
                 if files:

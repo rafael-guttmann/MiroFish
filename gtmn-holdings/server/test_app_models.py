@@ -114,13 +114,16 @@ class ModelPickerApiTests(unittest.TestCase):
     def test_the_model_travels_with_an_upload(self):
         self.live()
         boundary = "model-boundary"
-        meta = json.dumps({"title": "Review this brief", "firm": "gtmn-cto", "model": "sonnet"})
+        meta = json.dumps({"title": "Review this brief", "brief": "Check the attached business case.",
+                           "company": "Upload Company", "firm": "gtmn-cto", "model": "sonnet"})
         body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"metadata\"\r\n\r\n{meta}"
                 f"\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"files\"; filename=\"brief.md\"\r\n"
                 f"Content-Type: text/markdown\r\n\r\nBusiness case.\r\n--{boundary}--\r\n").encode()
         status, created = call("/api/jobs", raw=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
         self.assertEqual((status, created["files"]), (201, 1))
-        self.assertEqual(call(f"/api/jobs/{created['id']}")[1]["model"], "sonnet")
+        job = call(f"/api/jobs/{created['id']}")[1]
+        self.assertEqual((job["model"], job["company"], job["brief"]),
+                         ("sonnet", "Upload Company", "Check the attached business case."))
 
     def test_work_detail_and_the_list_show_what_each_job_really_ran_on(self):
         self.live()
@@ -141,6 +144,88 @@ class ModelPickerApiTests(unittest.TestCase):
                       (old, "claude-sonnet-4-5-20250929", 10, 10, 2.0, time.time()))
         job = call(f"/api/jobs/{old}")[1]
         self.assertEqual((job["model"], job["model_name"], job["ran_on"]), (None, None, ["Sonnet 4.5"]))
+
+
+class DemandMetadataApiTests(unittest.TestCase):
+    def setUp(self):
+        self.runner = FakeLiveRunner(SONNET_AND_OPUS)
+        patcher = patch.object(app, "runner", self.runner)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_title_company_and_full_instructions_are_stored_and_returned(self):
+        brief = "Check architecture and operations.\n\n" + "Preserve every requirement. " * 40
+        status, created = new_demand(title="  Platform   review ", company="  Example   Holdings  ", brief=brief)
+        self.assertEqual(status, 201)
+        detail = call(f"/api/jobs/{created['id']}")[1]
+        listed = next(j for j in call("/api/jobs")[1] if j["id"] == created["id"])
+        for job in (detail, listed):
+            self.assertEqual((job["title"], job["company"], job["brief"]),
+                             ("Platform review", "Example Holdings", brief.strip()))
+        self.assertEqual(self.runner.started, [created["id"]])
+        from store import Store
+        reopened = Store(app.DATA / "holdings.db")
+        try:
+            saved = reopened.one("SELECT title, brief, company FROM jobs WHERE id=?", (created["id"],))
+            self.assertEqual((saved["title"], saved["brief"], saved["company"]),
+                             ("Platform review", brief.strip(), "Example Holdings"))
+        finally:
+            reopened.db.close()
+
+    def test_title_only_clients_and_existing_demands_keep_their_instructions(self):
+        _, created = new_demand(title="Earlier client request")
+        old = app.store.run("INSERT INTO jobs(title,firm,created) VALUES(?,?,?)",
+                            ("Legacy demand", "gtmn-cto", time.time()))
+        for jid, text in ((created["id"], "Earlier client request"), (old, "Legacy demand")):
+            detail = call(f"/api/jobs/{jid}")[1]
+            listed = next(j for j in call("/api/jobs")[1] if j["id"] == jid)
+            for job in (detail, listed):
+                self.assertEqual((job["title"], job["brief"], job["company"]), (text, text, ""))
+
+    def test_existing_company_spelling_is_reused_case_insensitively(self):
+        _, first = new_demand(company="Árvore Capital")
+        _, second = new_demand(company="  ÁRVORE   CAPITAL ")
+        a = call(f"/api/jobs/{first['id']}")[1]
+        b = call(f"/api/jobs/{second['id']}")[1]
+        self.assertEqual(a["company"], b["company"])
+
+    def test_routing_uses_the_full_demand_not_just_the_short_title(self):
+        with patch.object(app, "approved", return_value=True):
+            status, created = new_demand(title="Quarterly review", firm=None,
+                                         brief="Prepare the noteholder credit analysis.")
+        self.assertEqual((status, created["firm"]), (201, "zencredit-firm"))
+
+    def test_invalid_metadata_is_refused_without_creating_or_starting_work(self):
+        before = len(call("/api/jobs")[1])
+        invalid = [{"title": " "}, {"brief": ""}, {"brief": " \n "}, {"title": None},
+                   {"brief": ["task"]}, {"company": {"name": "Bad"}}, {"company": None},
+                   {"title": "t" * 301}, {"company": "c" * 161}, {"brief": "b" * 20001}]
+        for values in invalid:
+            with self.subTest(values=list(values)):
+                status, body = new_demand(**values)
+                self.assertEqual(status, 400)
+                self.assertTrue(body["error"])
+        self.assertEqual(call("/api/jobs", [])[0], 400)
+        self.assertEqual(len(call("/api/jobs")[1]), before)
+        self.assertEqual(self.runner.started, [])
+
+    def test_field_limits_are_inclusive_without_truncation(self):
+        values = {"title": "T" * 300, "company": "C" * 160, "brief": "B" * 20000}
+        status, created = new_demand(**values)
+        self.assertEqual(status, 201)
+        job = call(f"/api/jobs/{created['id']}")[1]
+        self.assertEqual({key: job[key] for key in values}, values)
+
+    def test_library_metadata_stays_linked_when_a_demand_is_archived(self):
+        _, created = new_demand(title="Company review", brief="Review the supplied accounts.", company="Library Co")
+        jid = created["id"]
+        doc_id = app.store.run("INSERT INTO docs(job,name,kind,by,created) VALUES(?,?,?,?,?)",
+                               (jid, "Review memo", "Memo", "desk", time.time()))
+        self.assertEqual(call("/api/jobs/bulk", {"ids": [jid], "action": "archive"})[0], 200)
+        docs = call("/api/library")[1]["docs"]
+        doc = next(d for d in docs if d["id"] == doc_id)
+        self.assertEqual((doc["job"], doc["demand_title"], doc["company"], doc["archived"]),
+                         (jid, "Company review", "Library Co", 1))
 
 
 if __name__ == "__main__":
